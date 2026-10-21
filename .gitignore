@@ -1,0 +1,51 @@
+# History
+.Rhistory
+.Rapp.history
+
+# Data
+.RData
+.RDataTmp
+
+# User and development files
+.Ruserdata
+.Rprofile
+dev_history.R
+dev/
+.here
+.DS_Store
+.vscode
+
+# RStudio files
+*.Rproj
+*.Rproj.user/
+
+# Auth
+.httr-oauth
+.Renviron
+
+# Documentation
+vignettes/*.html
+vignettes/*.pdf
+vignettes/*.R
+docs/
+
+# Build and deployment
+*-Ex.R
+/*.Rcheck/
+/*.tar.gz
+rsconnect/
+^compile_commands\.json$
+^CRAN-SUBMISSION$
+^cran-comments\.md$
+^CRAN-RELEASE$
+*.html
+
+# knitr and R markdown
+*.utf8.md
+*.knit.md
+*_cache/
+/cache/
+
+# Example applications (dev)
+inst/examples
+tests/testthat/test-example-apps.R

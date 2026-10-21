@@ -1,0 +1,20 @@
+Package: phsdeploy
+Title: Provide a consistent pipeline for publishing information products within PHS
+Version: 0.0.0.9000
+Authors@R: c(
+    person(given = "Russell",
+           family = "McCreath",
+           role = c("aut", "cre"),
+           email = "russell.mccreath@phs.scot"),
+    person("Public Health Scotland", role = c("cph"))
+  )
+Description: A utility package that handles the interface between products being deployed and where they are hosted, including retrieval, permissions, checks, and actions required.
+License: MIT + file LICENSE
+URL: https://github.com/public-health-scotland/phsdeploy,
+    https://code.publichealthscotland.scot/phsdeploy/
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.0
