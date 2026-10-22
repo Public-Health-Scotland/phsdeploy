@@ -22,5 +22,7 @@ Depends:
 Imports: 
     cli,
     connectapi (>= 0.11.0),
+    fs,
+    openssl,
     rlang
 Config/roxygen2/version: 8.1.0
