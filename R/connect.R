@@ -9,7 +9,7 @@
 #' @export
 phs_connect_int <- function(config = phsdeploy_config("int")) {
   connectapi::connect(
-    server = config$int$url, 
+    server = config$int$url,
     api_key = config$int$key
   )
 }

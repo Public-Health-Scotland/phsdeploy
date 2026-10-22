@@ -15,7 +15,7 @@ get_int_content <- function(guid, client = phs_connect_int()) {
 #' Summarise a connectapi content item
 #'
 #' Flattens the fields from a connectapi `Content` object for easier use.
-#' It is kept separate from [get_int_content()] so a caller that already
+#' It is kept separate from `get_int_content()`` so a caller that already
 #' holds the item doesn't request it again.
 #'
 #' @param item A connectapi `Content` object.
@@ -268,7 +268,7 @@ system_tar <- function() {
 #' deleted and an empty folder that already existed is emptied but kept.
 #'
 #' @param exdir The folder being unpacked into.
-#' @param created `TRUE` if [unpack_bundle()] created `exdir`.
+#' @param created `TRUE` if `unpack_bundle()` created `exdir`.
 #' @param msg A cli message: a string or a named bullet vector.
 #' @param class The error class.
 #' @param .envir The environment where `msg`'s `{}` values are found,
@@ -288,7 +288,7 @@ abort_unpack <- function(exdir, created, msg, class = "phsdeploy_unsafe_bundle",
 
 #' Raise an unsafe-bundle error
 #'
-#' Gives every refusal from [unpack_bundle()] the same class, so callers and
+#' Gives every refusal from `unpack_bundle()` the same class, so callers and
 #' tests can catch them as one kind of failure.
 #'
 #' @param msg A cli message: a string or a named bullet vector.

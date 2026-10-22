@@ -66,9 +66,9 @@ new_phsdeploy_config <- function(int = NULL) {
 }
 
 #' Read an environment variable as a config value
-#' 
+#'
 #' Identify values from environment variables. Returns NULL when no value can be found.
-#' 
+#'
 #' @param name environment variable name
 #' @noRd
 config_value <- function(name, url = FALSE) {
@@ -77,10 +77,10 @@ config_value <- function(name, url = FALSE) {
 }
 
 #' Clean value utility
-#' 
+#'
 #' Trim whitespace and strip one pair of surrounding quotes. A trailing "/" is only
 #' stripped from URLs (`url = TRUE`), never from keys or secrets.
-#' 
+#'
 #' @param x the text to be cleaned
 #' @param url a flag to note if the value is supposed to be a URL
 #' @noRd
@@ -93,9 +93,9 @@ clean_value <- function(x, url = FALSE) {
 }
 
 #' Abort config utility
-#' 
+#'
 #' Gracefully encounter issues with defining config values, collect errors, and abort processes.
-#' 
+#'
 #' @param missing missing value name(s)
 #' @param invalid invalid value name(s)
 #' @noRd
