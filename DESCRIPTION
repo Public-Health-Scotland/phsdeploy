@@ -24,5 +24,6 @@ Imports:
     connectapi (>= 0.11.0),
     fs,
     openssl,
-    rlang
+    rlang,
+    utils
 Config/roxygen2/version: 8.1.0
