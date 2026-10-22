@@ -2,7 +2,6 @@
 #'
 #' @param guid The content GUID on the internal Connect server.
 #' @param client A connectapi client, by default `phs_connect_int()`.
-#'
 #' @return A list with `guid`, `name`, `title`, `owner_guid`, `app_mode`,
 #'   `bundle_id` (character, `NA` if never deployed), `last_deployed_time`,
 #'   `content_url` and `dashboard_url` (`NA` when the server gives none).
@@ -10,7 +9,21 @@
 get_int_content <- function(guid, client = phs_connect_int()) {
   check_guid(guid)
 
-  item <- connectapi::content_item(client, guid)
+  content_summary(connectapi::content_item(client, guid))
+}
+
+#' Summarise a connectapi content item
+#'
+#' Flattens the fields from a connectapi `Content` object for easier use.
+#' It is kept separate from [get_int_content()] so a caller that already
+#' holds the item doesn't request it again.
+#'
+#' @param item A connectapi `Content` object.
+#' @return A list with `guid`, `name`, `title`, `owner_guid`, `app_mode`,
+#'   `bundle_id` (`NA` if never deployed), `last_deployed_time`,
+#'   `content_url` and `dashboard_url` (`NA` when the server gives none).
+#' @noRd
+content_summary <- function(item) {
   x <- item$content
   list(
     guid = flat_chr(x$guid),
@@ -45,7 +58,14 @@ get_int_content_bundles <- function(guid, client = phs_connect_int()) {
   )
 }
 
-# NULL / missing becomes NA_character_ and anything else becomes a single string.
+#' Flatten value from API into a single string
+#' 
+#' NULL / missing becomes NA_character_ and anything else becomes a single string.
+#' This maintains a single fixed shape for anything returned by the server.
+#' 
+#' @param x A vlaue from a parsed API response.
+#' @return First element as a string or `NA_character_` for `NULL` or an empty value.
+#' @noRd
 flat_chr <- function(x) {
   if (is.null(x) || length(x) == 0L) NA_character_ else as.character(x[[1]])
 }
@@ -65,8 +85,10 @@ flat_chr <- function(x) {
 fetch_bundle <- function(guid, bundle_id = NULL, dir, client = phs_connect_int()) {
   check_guid(guid)
 
+  item <- connectapi::content_item(client, guid)
+
   if (is.null(bundle_id)) {
-    bundle_id <- get_int_content(guid, client)$bundle_id
+    bundle_id <- content_summary(item)$bundle_id
     if (is.na(bundle_id)) {
       cli::cli_abort(
         c("Content {.val {guid}} has never been deployed, so it has no bundle."),
@@ -90,7 +112,7 @@ fetch_bundle <- function(guid, bundle_id = NULL, dir, client = phs_connect_int()
 
   fs::dir_create(dir)
   path <- file.path(dir, paste0("bundle-", bundle_id, ".tar.gz"))
-  item <- connectapi::content_item(client, guid)
+
   suppressMessages(
     connectapi::download_bundle(item, filename = path, bundle_id = bundle_id, overwrite = TRUE)
   )
@@ -121,8 +143,11 @@ format_bundle_id <- function(x, call = rlang::caller_env()) {
 
 #' SHA-256 checksum of a file
 #' 
+#' Read from a connection rather than into memory, so large bundles don't need to fit
+#' in RAM. The checksum identifies the exact published bundle.
+#' 
 #' @param path File path.
-#' @return Lowercase hex string.
+#' @return Checksum as lowercase hex string.
 #' @noRd
 bundle_sha256 <- function(path) {
   con <- file(path, "rb")
