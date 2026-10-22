@@ -8,6 +8,8 @@
 #'   `content_url` and `dashboard_url` (`NA` when the server gives none).
 #' @export
 get_int_content <- function(guid, client = phs_connect_int()) {
+  check_guid(guid)
+
   item <- connectapi::content_item(client, guid)
   x <- item$content
   list(
@@ -31,6 +33,8 @@ get_int_content <- function(guid, client = phs_connect_int()) {
 #'   (double) and `created_time` (character), one row per bundle.
 #' @export
 get_int_content_bundles <- function(guid, client = phs_connect_int()) {
+  check_guid(guid)
+
   raw <- client$GET(paste0("v1/content/", guid, "/bundles"))
   data.frame(
     id = vapply(raw, function(b) flat_chr(b$id), character(1)),
@@ -59,6 +63,8 @@ flat_chr <- function(x) {
 #' @return A list with `path`, `guid`, `bundle_id` and `sha256`.
 #' @noRd
 fetch_bundle <- function(guid, bundle_id = NULL, dir, client = phs_connect_int()) {
+  check_guid(guid)
+
   if (is.null(bundle_id)) {
     bundle_id <- get_int_content(guid, client)$bundle_id
     if (is.na(bundle_id)) {
@@ -92,15 +98,24 @@ fetch_bundle <- function(guid, bundle_id = NULL, dir, client = phs_connect_int()
   list(path = path, guid = guid, bundle_id = bundle_id, sha256 = bundle_sha256(path))
 }
 
-#' A bundle id as text
+#' Format a bundle id as text
 #'
-#' A number is written out in full (`100000`, never `1e+05`), so it matches
+#' A number or string is written out in full (`100000`, never `1e+05`), so it matches
 #' the ids Connect lists.
 #' 
 #' @param x A bundle id: a string or a single number.
-#' @return A string.
+#' @param call The environment of the calling function.
+#' @return A string. Otherwise error of class `phsdeploy_bad_bundle_id`.
 #' @noRd
-format_bundle_id <- function(x) {
+format_bundle_id <- function(x, call = rlang::caller_env()) {
+  if (!(is.character(x) || is.numeric(x)) || length(x) != 1L || is.na(x)) {
+    cli::cli_abort(
+      "{.arg bundle_id} must be a single bundle id.",
+      class = c("phsdeploy_bad_bundle_id", "phsdeploy_error"),
+      call = call
+    )
+  }
+
   if (is.numeric(x)) format(x, scientific = FALSE, trim = TRUE) else as.character(x)
 }
 
