@@ -34,10 +34,10 @@ docs/
 /*.Rcheck/
 /*.tar.gz
 rsconnect/
-^compile_commands\.json$
-^CRAN-SUBMISSION$
-^cran-comments\.md$
-^CRAN-RELEASE$
+compile_commands.json
+CRAN-SUBMISSION
+cran-comments.md
+CRAN-RELEASE
 *.html
 
 # knitr and R markdown

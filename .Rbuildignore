@@ -7,7 +7,7 @@
 ^data-raw$
 dev_history.R
 ^dev$
-$run_dev.*
+^run_dev.*
 ^.here$
 ^LICENSE\.md$
 ^\.vscode$
