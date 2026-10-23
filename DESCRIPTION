@@ -23,6 +23,7 @@ Imports:
     cli,
     connectapi (>= 0.11.0),
     fs,
+    jsonlite,
     openssl,
     rlang,
     utils
