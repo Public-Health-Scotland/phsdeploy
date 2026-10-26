@@ -239,3 +239,51 @@ write_manifest <- function(manifest, path) {
   }
   invisible(path)
 }
+
+#' What a Connect Cloud item needs to know about a bundle
+#'
+#' Reads the app mode and primary file from the manifest. A new Cloud item is
+#' created with both, so they must agree with what `rsconnect::deployApp()`
+#' sends on each deploy. rsconnect uses `primary_rmd`, then `primary_html`, so
+#' this checks them in the same order before falling back to `entrypoint` and
+#' the usual file for the app mode.
+#'
+#' @param path Path to `manifest.json`.
+#' @return A list with `app_mode` and `primary_file`. Otherwise an error of
+#'   class `phsdeploy_bad_manifest` or `phsdeploy_unsupported_content`.
+#' @noRd
+manifest_target <- function(path) {
+  meta <- read_manifest(path)[["metadata"]]
+  mode <- if (is.list(meta)) meta[["appmode"]]
+  if (!rlang::is_string(mode) || !nzchar(mode)) {
+    cli::cli_abort(
+      "Manifest {.file {path}} doesn't say what kind of content this is ({.field metadata.appmode}).",
+      class = c("phsdeploy_bad_manifest", "phsdeploy_error")
+    )
+  }
+  if (!mode %in% names(cloud_content_types)) {
+    cli::cli_abort(
+      c(
+        "Posit Connect Cloud can't host content of type {.val {mode}}.",
+        "i" = "Supported: {.val {names(cloud_content_types)}}."
+      ),
+      class = c("phsdeploy_unsupported_content", "phsdeploy_error"),
+      app_mode = mode
+    )
+  }
+  candidates <- list(
+    meta[["primary_rmd"]], meta[["primary_html"]], meta[["entrypoint"]],
+    switch(mode,
+      shiny = "app.R",
+      static = "index.html"
+    )
+  )
+  primary <- Find(function(x) rlang::is_string(x) && nzchar(x), candidates)
+  if (is.null(primary) || is_unsafe_entry(primary)) {
+    cli::cli_abort(
+      "Manifest {.file {path}} names no usable primary file for {.val {mode}} content.",
+      class = c("phsdeploy_bad_manifest", "phsdeploy_error")
+    )
+  }
+  list(app_mode = mode, primary_file = primary)
+}
