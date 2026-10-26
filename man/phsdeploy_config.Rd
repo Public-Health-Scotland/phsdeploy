@@ -2,23 +2,26 @@
 % Please edit documentation in R/config.R
 \name{phsdeploy_config}
 \alias{phsdeploy_config}
-\title{Read a configuration from environment variables}
+\title{Read the configuration from environment variables}
 \usage{
-phsdeploy_config(needs = c("int"))
+phsdeploy_config(needs = c("int", "cld"))
 }
 \arguments{
-\item{needs}{Which settings to read: \code{"int"} (internal Connect)}
+\item{needs}{Which settings to read: \code{"int"} (internal Connect), \code{"cld"}
+(Connect Cloud), or both.}
 }
 \value{
-An object of class \code{phsdeploy_config}: a list with \code{int}
-(\code{url}, \code{key}).
+An object of class \code{phsdeploy_config}: a list with \code{int} (\code{url},
+\code{key}) and/or \code{cld} (\code{account}, \code{client_id}, \code{client_secret}).
 
-If anything is missing, an error of class \code{phsdeploy_config_error} is
-raised, with a \code{missing} field naming every missing variable.
+If anything is missing or invalid, an error of class
+\code{phsdeploy_config_error} is raised, with \code{missing} and \code{invalid} fields
+naming the variables.
 }
 \description{
-Reads the settings required from environment variables (normally set in \code{.Renviron})
-and returns as one object.
+Reads the settings needed from environment variables (normally set in
+\code{.Renviron}) and returns them as one object. Every missing or invalid
+variable is reported in one error, so they can all be fixed at once.
 }
 \details{
 Variables read:
@@ -28,7 +31,16 @@ Variables read:
 \item \code{PHSDEPLOY_INT_URL}: the server URL
 \item \code{PHSDEPLOY_INT_KEY}: an API key
 }
+\item Posit Connect Cloud (\code{needs = "cld"}):
+\itemize{
+\item \code{PHSDEPLOY_CLD_ACCOUNT}: the Connect Cloud account name
+\item \code{PHSDEPLOY_CLD_CLIENT_ID}: the client ID of a credential with access to
+that account
+\item \code{PHSDEPLOY_CLD_CLIENT_SECRET}: that credential's client secret
 }
+}
+
+Printing the result never shows the key or the client secret.
 }
 \examples{
 \dontrun{

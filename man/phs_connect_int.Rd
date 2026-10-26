@@ -2,7 +2,7 @@
 % Please edit documentation in R/connect.R
 \name{phs_connect_int}
 \alias{phs_connect_int}
-\title{Connect to PHS Connect internal}
+\title{Connect to the PHS internal Connect server}
 \usage{
 phs_connect_int(config = phsdeploy_config("int"))
 }

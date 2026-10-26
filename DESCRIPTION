@@ -23,8 +23,11 @@ Imports:
     cli,
     connectapi (>= 0.11.0),
     fs,
+    httr2 (>= 1.2.0),
     jsonlite,
     openssl,
-    rlang,
-    utils
+    rlang (>= 1.1.0),
+    rsconnect (>= 1.11.2),
+    utils,
+    withr
 Config/roxygen2/version: 8.1.0
