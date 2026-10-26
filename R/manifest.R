@@ -46,9 +46,11 @@ host_pattern <- function(hosts) {
 #' A manifest records the repository each package was installed from when the
 #' content was first deployed. For PHS content that is usually the internal
 #' package manager, which Connect Cloud cannot reach. This rewrites each
-#' package's `Repository` and `description$Repository` to the public
-#' equivalent from `map`, keeping the snapshot date so the same package
-#' versions are installed.
+#' package's `Repository`, `description$Repository` and `description$Remote*`
+#' fields to the public equivalent from `map`, keeping the snapshot date so
+#' the same package versions are installed. The `Remote*` fields matter
+#' because packages installed with pak or renv also record their repository
+#' in `RemoteRepos`.
 #'
 #' Afterwards, every text field of every package entry is checked against
 #' `internal`. Any match (for example a package from a non-CRAN
@@ -93,11 +95,17 @@ rewrite_manifest_repos <- function(manifest_path,
     }
 
     if (is.list(entry[["description"]])) {
-      from <- repo_value(entry[["description"]][["Repository"]])
-      to <- map_repo(from, map)
-      if (!is.na(to)) {
-        entry[["description"]][["Repository"]] <- to
-        changes[nrow(changes) + 1L, ] <- list(name, "description.Repository", from, to)
+      description_fields <- names(entry[["description"]])
+      repo_fields <- description_fields[
+        description_fields == "Repository" | startsWith(description_fields, "Remote")
+      ]
+      for (field in repo_fields) {
+        from <- repo_value(entry[["description"]][[field]])
+        to <- map_repo(from, map)
+        if (!is.na(to)) {
+          entry[["description"]][[field]] <- to
+          changes[nrow(changes) + 1L, ] <- list(name, paste0("description.", field), from, to)
+        }
       }
     }
 
@@ -206,9 +214,11 @@ repo_value <- function(x) {
 
 #' Fields of a package entry that refer to internal servers
 #'
-#' Checks every text value in the entry, including its `description`, so
-#' internal references outside `Repository` are found too, for example a
-#' `RemoteUrl` on the internal git server.
+#' Only checks the fields that decide where a package is installed from:
+#' `Repository`, `description.Repository` and the `description.Remote*`
+#' fields, such as `RemoteUrl` for a package installed from a git server.
+#' Other fields, such as `URL` or `Maintainer`, can mention PHS websites
+#' without affecting installation, so they are ignored.
 #'
 #' @param entry One package entry from a manifest.
 #' @param pattern A regular expression matching internal hosts.
@@ -217,7 +227,9 @@ repo_value <- function(x) {
 #' @noRd
 internal_fields <- function(entry, pattern) {
   values <- unlist(entry)
-  names(values)[grepl(pattern, values, ignore.case = TRUE)]
+  install <- names(values) %in% c("Repository", "description.Repository") |
+    startsWith(names(values), "description.Remote")
+  names(values)[install & grepl(pattern, values, ignore.case = TRUE)]
 }
 
 #' Write a manifest file safely
@@ -286,4 +298,44 @@ manifest_target <- function(path) {
     )
   }
   list(app_mode = mode, primary_file = primary)
+}
+
+#' The GitHub repository of each GitHub package in a manifest
+#'
+#' A package installed from GitHub records its owner and repository in
+#' `RemoteUsername` and `RemoteRepo`. Only packages on github.com are listed,
+#' since GitHub Enterprise servers can't be checked the same way.
+#'
+#' @param manifest The manifest as a list, as from `read_manifest()`.
+#' @return A data frame with `package` and `repo` (`"owner/name"`), one row
+#'   per GitHub package.
+#' @noRd
+github_package_repos <- function(manifest) {
+  packages <- manifest[["packages"]]
+  rows <- lapply(names(packages), function(name) {
+    description <- packages[[name]][["description"]]
+    if (!is.list(description)) {
+      return(NULL)
+    }
+    type <- tolower(repo_value(description[["RemoteType"]]) %|% "")
+    host <- repo_value(description[["RemoteHost"]]) %|% "api.github.com"
+    owner <- repo_value(description[["RemoteUsername"]])
+    repo <- repo_value(description[["RemoteRepo"]])
+    if (type != "github" || host != "api.github.com" || is.na(owner) || is.na(repo)) {
+      return(NULL)
+    }
+    data.frame(package = name, repo = paste0(owner, "/", repo))
+  })
+  out <- do.call(rbind, rows)
+  if (is.null(out)) data.frame(package = character(), repo = character()) else out
+}
+
+#' Use a default for an `NA` value
+#'
+#' @param x A single value.
+#' @param y The value to use when `x` is `NA`.
+#' @return `x`, or `y` if `x` is `NA`.
+#' @noRd
+`%|%` <- function(x, y) {
+  if (is.na(x)) y else x
 }

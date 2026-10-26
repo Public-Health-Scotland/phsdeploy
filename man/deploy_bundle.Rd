@@ -47,9 +47,12 @@ A list with \code{guid}, \code{bundle_id}, \code{sha256}, \code{cloud_id},
 \code{first_deploy}, \code{title}, \code{access}, \code{domain_id}, \code{name}, \code{url} (the custom
 address, or \code{NA}) and \code{repo_changes} (from the manifest rewrite).
 
-Otherwise an error of class \code{phsdeploy_error}. A failed deploy into an
-item this call created raises \code{phsdeploy_deploy_failed} with the item's
-\code{cloud_id}, so the retry can update that item rather than create another.
+Otherwise an error of class \code{phsdeploy_error}. A failed deploy raises
+\code{phsdeploy_deploy_failed} with the item's \code{cloud_id}. If this call created
+the item, retry with \verb{deploy_bundle(guid, cloud_id = <that id>)}, which
+finishes it as an update rather than creating another. A network failure
+is retried once before it is reported, with the extra class
+\code{phsdeploy_cloud_unreachable}.
 }
 \description{
 Downloads a bundle of internal content, rewrites its package repositories

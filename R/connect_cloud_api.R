@@ -252,10 +252,11 @@ cloud_perform <- function(req) {
 #' Build an authenticated Connect Cloud API request
 #'
 #' Gets (or reuses) the access token, so building a request may make the token
-#' request. Retries up to 3 times on a 429 or 5xx response. A `POST` is retried
-#' only on 429, so a create that may have reached the server is never repeated.
-#' HTTP errors are not raised by httr2, because its errors carry the request -
-#' `cloud_call()` raises its own instead.
+#' request. Retries up to 3 times on a 429 or 5xx response, and on a network
+#' failure with no response at all (such as a dropped or stale connection).
+#' A `POST` is retried only on 429, so a create that may have reached the
+#' server is never repeated. HTTP errors are not raised by httr2, because its
+#' errors carry the request - `cloud_call()` raises its own instead.
 #'
 #' @param cld A `phsdeploy_cld` connection.
 #' @param path API path below `cloud_api_base`, starting with `/`, without a
@@ -273,7 +274,12 @@ cloud_request <- function(cld, path, method = "GET", call = rlang::caller_env())
   req <- httr2::req_headers(req, Accept = "application/json")
   req <- httr2::req_user_agent(req, cloud_user_agent)
   req <- httr2::req_timeout(req, 60)
-  req <- httr2::req_retry(req, max_tries = 3, is_transient = cloud_is_transient(method))
+  req <- httr2::req_retry(
+    req,
+    max_tries = 3,
+    retry_on_failure = toupper(method) != "POST",
+    is_transient = cloud_is_transient(method)
+  )
   httr2::req_error(req, is_error = function(resp) FALSE)
 }
 
@@ -778,6 +784,7 @@ cloud_set_access <- function(cld, id, access) {
 cloud_delete_content <- function(cld, id) {
   check_cld(cld)
   check_content_id(id)
+  local_rsconnect_http()
   result <- tryCatch(
     {
       suppressMessages(rsconnect::deleteContent(

@@ -91,7 +91,13 @@ download_bundle <- function(guid, dir, bundle_id = NULL, client = phs_connect_in
     bundle_id <- content_summary(item)$bundle_id
     if (is.na(bundle_id)) {
       cli::cli_abort(
-        c("Content {.val {guid}} has never been deployed, so it has no bundle."),
+        c(
+          "Content {.val {guid}} has no active bundle to download.",
+          "i" = paste(
+            "Either it has never been deployed, or every deploy has failed, for example",
+            "because the server couldn't install one of its packages."
+          )
+        ),
         class = c("phsdeploy_no_bundle", "phsdeploy_error")
       )
     }

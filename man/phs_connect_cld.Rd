@@ -17,14 +17,17 @@ client secret.
 
 Otherwise an error of class \code{phsdeploy_rsconnect_config_not_temporary}
 (rsconnect's folders are not inside \code{tempdir()}), \code{phsdeploy_cloud_auth_error}
-(rsconnect could not register the account), \code{phsdeploy_cloud_token_error}
+(rsconnect could not register the account, also of class
+\code{phsdeploy_cloud_unreachable} when the network failed twice rather than
+the credentials being refused), \code{phsdeploy_cloud_token_error}
 or \code{phsdeploy_cloud_http_error} (the account id lookup failed), or
 \code{phsdeploy_cloud_account_not_found}.
 }
 \description{
 Registers the configured Connect Cloud account with rsconnect, which
 deploying and deleting need, and looks up the account's id through the
-Connect Cloud API.
+Connect Cloud API. A network failure (no answer from the server) is retried
+once, since it often clears by itself. A refused credential isn't retried.
 }
 \details{
 rsconnect stores the account, credential included, in its config folder.

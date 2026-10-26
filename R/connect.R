@@ -18,7 +18,8 @@ phs_connect_int <- function(config = phsdeploy_config("int")) {
 #'
 #' Registers the configured Connect Cloud account with rsconnect, which
 #' deploying and deleting need, and looks up the account's id through the
-#' Connect Cloud API.
+#' Connect Cloud API. A network failure (no answer from the server) is retried
+#' once, since it often clears by itself. A refused credential isn't retried.
 #'
 #' rsconnect stores the account, credential included, in its config folder.
 #' **Call `local_rsconnect_config()` (internal) first, in the calling
@@ -34,7 +35,9 @@ phs_connect_int <- function(config = phsdeploy_config("int")) {
 #'
 #'   Otherwise an error of class `phsdeploy_rsconnect_config_not_temporary`
 #'   (rsconnect's folders are not inside `tempdir()`), `phsdeploy_cloud_auth_error`
-#'   (rsconnect could not register the account), `phsdeploy_cloud_token_error`
+#'   (rsconnect could not register the account, also of class
+#'   `phsdeploy_cloud_unreachable` when the network failed twice rather than
+#'   the credentials being refused), `phsdeploy_cloud_token_error`
 #'   or `phsdeploy_cloud_http_error` (the account id lookup failed), or
 #'   `phsdeploy_cloud_account_not_found`.
 #' @export
@@ -42,7 +45,52 @@ phs_connect_cld <- function(config = phsdeploy_config("cld")) {
   check_rsconnect_config_temporary()
   settings <- config$cld
 
-  registered <- tryCatch(
+  registered <- register_cloud_account(settings)
+  if (is_network_failure(registered)) {
+    Sys.sleep(2)
+    registered <- register_cloud_account(settings)
+  }
+  if (inherits(registered, "error")) {
+    detail <- squish_scrub(conditionMessage(registered), settings$client_secret)
+    network <- is_network_failure(registered)
+    cli::cli_abort(
+      c(
+        if (network) {
+          "Could not reach Posit Connect Cloud to sign in, even after a retry."
+        } else {
+          "Posit Connect Cloud refused the sign-in."
+        },
+        "x" = "{detail}",
+        "i" = if (network) {
+          "This is a network problem, not the credentials. If it persists, restart R."
+        } else {
+          "Check {.envvar PHSDEPLOY_CLD_CLIENT_ID} and {.envvar PHSDEPLOY_CLD_CLIENT_SECRET}."
+        }
+      ),
+      class = c(
+        if (network) "phsdeploy_cloud_unreachable",
+        "phsdeploy_cloud_auth_error", "phsdeploy_error"
+      )
+    )
+  }
+
+  cld <- new_phsdeploy_cld(
+    account = settings$account,
+    client_id = settings$client_id,
+    client_secret = settings$client_secret
+  )
+  cld$account_id <- cloud_account_id(cld)
+  cld
+}
+
+#' Register the Connect Cloud account with rsconnect
+#'
+#' @param settings The `cld` part of a `phsdeploy_config`.
+#' @return `TRUE`, or the error rsconnect raised.
+#' @noRd
+register_cloud_account <- function(settings) {
+  local_rsconnect_http()
+  tryCatch(
     {
       rsconnect::connectCloudClientCredentials(
         clientId = settings$client_id,
@@ -54,21 +102,53 @@ phs_connect_cld <- function(config = phsdeploy_config("cld")) {
     },
     error = function(e) e
   )
-  if (inherits(registered, "error")) {
-    detail <- squish_scrub(conditionMessage(registered), settings$client_secret)
-    cli::cli_abort(
-      c("Could not sign in to Posit Connect Cloud.", "x" = "{detail}"),
-      class = c("phsdeploy_cloud_auth_error", "phsdeploy_error")
-    )
-  }
+}
 
-  cld <- new_phsdeploy_cld(
-    account = settings$account,
-    client_id = settings$client_id,
-    client_secret = settings$client_secret
+#' Did a request fail without reaching the server?
+#'
+#' A network failure, such as a timeout or a dropped or stale connection, is
+#' worth retrying because it often clears by itself. httr2, which rsconnect
+#' uses, gives these the class `httr2_failure`. The curl error text is also
+#' matched, in case a caller re-raises the error without its class. An HTTP
+#' error (the server answered, for example to refuse a credential) or a failed
+#' build is not a network failure.
+#'
+#' @param x A condition, or any other value.
+#' @return `TRUE` for a network failure, otherwise `FALSE`.
+#' @noRd
+is_network_failure <- function(x) {
+  inherits(x, "error") && (
+    rlang::cnd_inherits(x, "httr2_failure") ||
+      grepl(network_failure_pattern, conditionMessage(x), ignore.case = TRUE)
   )
-  cld$account_id <- cloud_account_id(cld)
-  cld
+}
+
+#' Pattern for curl's network failure messages
+#'
+#' @format A single regular expression string.
+#' @noRd
+network_failure_pattern <- paste(
+  "timeout was reached", "timed out", "could not resolve", "failed to connect",
+  "connection reset", "recv failure", "send failure", "ssl connect error",
+  sep = "|"
+)
+
+#' Give rsconnect's requests a longer connection timeout
+#'
+#' rsconnect sets no timeout of its own, so the curl package's default limit
+#' of 10 seconds to open a connection applies. A slow network can exceed that
+#' without anything being wrong. This allows 60 seconds, through rsconnect's
+#' `rsconnect.libcurl.options` option, unless that option already sets one.
+#' Undone when `.local_envir` exits.
+#'
+#' @param .local_envir The environment whose exit undoes the change.
+#' @return `NULL`, invisibly.
+#' @noRd
+local_rsconnect_http <- function(.local_envir = parent.frame()) {
+  options <- getOption("rsconnect.libcurl.options", list())
+  if (is.null(options$connecttimeout)) options$connecttimeout <- 60L
+  withr::local_options(rsconnect.libcurl.options = options, .local_envir = .local_envir)
+  invisible()
 }
 
 #' Internal constructor for `phsdeploy_cld` objects

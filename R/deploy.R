@@ -41,9 +41,12 @@
 #'   `first_deploy`, `title`, `access`, `domain_id`, `name`, `url` (the custom
 #'   address, or `NA`) and `repo_changes` (from the manifest rewrite).
 #'
-#'   Otherwise an error of class `phsdeploy_error`. A failed deploy into an
-#'   item this call created raises `phsdeploy_deploy_failed` with the item's
-#'   `cloud_id`, so the retry can update that item rather than create another.
+#'   Otherwise an error of class `phsdeploy_error`. A failed deploy raises
+#'   `phsdeploy_deploy_failed` with the item's `cloud_id`. If this call created
+#'   the item, retry with `deploy_bundle(guid, cloud_id = <that id>)`, which
+#'   finishes it as an update rather than creating another. A network failure
+#'   is retried once before it is reported, with the extra class
+#'   `phsdeploy_cloud_unreachable`.
 #' @export
 deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
                           domain_id = NULL, name = NULL,
@@ -66,7 +69,11 @@ deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
   if (!is.null(domain_id)) check_domain_id(domain_id)
   if (!is.null(name)) check_vanity_name(name, "name")
 
+  connections_before <- open_connection_ids()
   work <- withr::local_tempdir(pattern = "phsdeploy-deploy-")
+  # Registered after the temporary folder, so it runs before the folder is
+  # removed.
+  withr::defer(close_new_connections(connections_before))
   if (is.null(cld)) {
     local_rsconnect_config()
     cld <- phs_connect_cld()
@@ -133,7 +140,141 @@ prepare_bundle <- function(guid, bundle_id, dir, client) {
   unpack_bundle(bundle$path, app_dir)
   manifest <- file.path(app_dir, "manifest.json")
   changes <- rewrite_manifest_repos(manifest)
+  check_github_packages_reachable(manifest)
   list(bundle = bundle, app_dir = app_dir, changes = changes, target = manifest_target(manifest))
+}
+
+#' Check Connect Cloud can install every GitHub package in a manifest
+#'
+#' Connect Cloud installs a GitHub package from a public repository, or from a
+#' private one its GitHub App has been given access to. Otherwise the package
+#' fails late, in the Cloud build, with a vague "unable to restore" error.
+#' This asks GitHub first, so the error is clear and comes before anything is
+#' created.
+#'
+#' GitHub doesn't say which private repositories the app can see, so those
+#' are listed in `cloud_github_access`: owners (`"Public-Health-Scotland"`)
+#' or single repositories (`"Public-Health-Scotland/phsshiny"`). If GitHub
+#' can't be asked (for example its rate limit for anonymous requests is used
+#' up), this warns and carries on, and the Cloud build decides.
+#'
+#' @param manifest Path to `manifest.json`.
+#' @param cloud_github_access Owners or repositories the Connect Cloud GitHub
+#'   App has access to, by default from the `phsdeploy.cloud_github_access`
+#'   option.
+#' @return `TRUE`, invisibly. Otherwise an error of class
+#'   `phsdeploy_private_package`.
+#' @noRd
+check_github_packages_reachable <- function(manifest,
+                                            cloud_github_access = getOption(
+                                              "phsdeploy.cloud_github_access",
+                                              character()
+                                            )) {
+  repos <- github_package_repos(read_manifest(manifest))
+  granted <- tolower(repos$repo) %in% tolower(cloud_github_access) |
+    tolower(sub("/.*", "", repos$repo)) %in% tolower(cloud_github_access)
+  repos <- repos[!granted, , drop = FALSE]
+  if (!nrow(repos)) {
+    return(invisible(TRUE))
+  }
+  status <- vapply(repos$repo, github_repo_status, character(1))
+  unknown <- repos$package[status == "unknown"]
+  if (length(unknown)) {
+    cli::cli_warn(
+      "Couldn't confirm that Connect Cloud can install {.pkg {unknown}} from GitHub.",
+      class = c("phsdeploy_github_unchecked", "phsdeploy_warning")
+    )
+  }
+  private <- repos[status == "private", , drop = FALSE]
+  if (nrow(private)) {
+    shown <- paste0(private$package, " (github.com/", private$repo, ")")
+    cli::cli_abort(
+      c(
+        "Connect Cloud can't install packages from these private GitHub repositories.",
+        "x" = "Private: {.val {shown}}.",
+        "i" = paste(
+          "If the Connect Cloud GitHub App has been given access to them, list their",
+          "owner or repository in {.code options(phsdeploy.cloud_github_access = )}."
+        ),
+        "i" = "Nothing was created on Connect Cloud."
+      ),
+      class = c("phsdeploy_private_package", "phsdeploy_error"),
+      packages = private$package
+    )
+  }
+  invisible(TRUE)
+}
+
+#' Ask GitHub whether a repository is public
+#'
+#' Asks without signing in, so only a public repository is found.
+#'
+#' @param repo The repository as `"owner/name"`.
+#' @return `"public"`, `"private"` (not found without signing in) or
+#'   `"unknown"` (GitHub couldn't be asked).
+#' @noRd
+github_repo_status <- function(repo) {
+  req <- httr2::request(paste0("https://api.github.com/repos/", repo))
+  req <- httr2::req_user_agent(req, cloud_user_agent)
+  req <- httr2::req_timeout(req, 15)
+  req <- httr2::req_error(req, is_error = function(resp) FALSE)
+  resp <- tryCatch(httr2::req_perform(req, verbosity = 0L), error = function(e) NULL)
+  if (is.null(resp)) {
+    return("unknown")
+  }
+  switch(as.character(httr2::resp_status(resp)),
+    "200" = "public",
+    "404" = "private",
+    "unknown"
+  )
+}
+
+#' Ids of the R connections that exist now
+#'
+#' Uses `getAllConnections()` rather than `showConnections()`, which runs
+#' garbage collection first. That would close an unreferenced file with R's
+#' own unhelpful warning before `close_new_connections()` could close it
+#' with a clear one.
+#'
+#' @return An integer vector of connection numbers, without the standard
+#'   input, output and error.
+#' @noRd
+open_connection_ids <- function() {
+  setdiff(getAllConnections(), 0:2)
+}
+
+#' Close file connections left open since a point in time
+#'
+#' Uploading a bundle can leave its file open. httr's `upload_file()`, which
+#' connectapi uses, only closes the file after a short read, and curl never
+#' asks for more bytes than remain, so the last read isn't short. A failed
+#' deploy can also leave a file open. R later closes any of these itself,
+#' with a "closing unused connection" warning that doesn't say where it came
+#' from. Closing them here, with a warning that names the file and the step,
+#' makes that traceable, and lets temporary folders be removed cleanly.
+#'
+#' @param before Connection ids from `open_connection_ids()`.
+#' @param during The step, for the warning, such as `"while deploying"`.
+#' @return The descriptions of the connections closed, invisibly.
+#' @noRd
+close_new_connections <- function(before, during = "while deploying") {
+  ids <- setdiff(open_connection_ids(), before)
+  closed <- character()
+  for (id in ids) {
+    con <- getConnection(id)
+    info <- summary(con)
+    if (info$class %in% c("file", "gzfile")) {
+      closed <- c(closed, basename(info$description))
+      close(con)
+    }
+  }
+  if (length(closed)) {
+    cli::cli_warn(
+      "Closed {length(closed)} file{?s} left open {during}: {.file {closed}}.",
+      class = c("phsdeploy_connection_left_open", "phsdeploy_warning")
+    )
+  }
+  invisible(closed)
 }
 
 #' Find one of the account's domains by id
@@ -256,6 +397,10 @@ check_domain_free <- function(cld, domain, name) {
 #' then stops instead of offering to create a new one. rsconnect's deployment
 #' record goes inside `dir`, so nothing is written next to the app or kept.
 #'
+#' A network failure is retried once, after 10 seconds. That's safe because
+#' the item already exists, so a second deploy only adds another revision. A
+#' failed build isn't retried, since the same bundle would fail again.
+#'
 #' @param cld A `phsdeploy_cld` connection.
 #' @param app_dir The unpacked app, with its rewritten manifest.
 #' @param cloud_id The item to deploy into.
@@ -263,41 +408,65 @@ check_domain_free <- function(cld, domain, name) {
 #' @param dir The temporary work folder.
 #' @param first_deploy `TRUE` if this call created the item.
 #' @return `TRUE`, invisibly. Otherwise an error of class
-#'   `phsdeploy_deploy_failed`, with `cloud_id`.
+#'   `phsdeploy_deploy_failed`, with `cloud_id`, and also of class
+#'   `phsdeploy_cloud_unreachable` after a network failure.
 #' @noRd
 run_deploy <- function(cld, app_dir, cloud_id, title, dir, first_deploy) {
   records <- file.path(dir, "records")
   dir.create(records)
-  result <- tryCatch(
-    withr::with_options(
-      list(rlang_interactive = FALSE),
-      rsconnect::deployApp(
-        appDir = app_dir,
-        manifestPath = file.path(app_dir, "manifest.json"),
-        appId = cloud_id,
-        account = cld$account,
-        server = cloud_server,
-        appTitle = title,
-        recordDir = records,
-        forceUpdate = TRUE,
-        launch.browser = FALSE,
-        lint = FALSE,
-        logLevel = "quiet"
-      )
-    ),
-    error = function(e) e
-  )
+  local_rsconnect_http()
+  deploy <- function() {
+    tryCatch(
+      withr::with_options(
+        list(rlang_interactive = FALSE),
+        rsconnect::deployApp(
+          appDir = app_dir,
+          manifestPath = file.path(app_dir, "manifest.json"),
+          appId = cloud_id,
+          account = cld$account,
+          server = cloud_server,
+          appTitle = title,
+          recordDir = records,
+          forceUpdate = TRUE,
+          launch.browser = FALSE,
+          lint = FALSE,
+          logLevel = "quiet"
+        )
+      ),
+      error = function(e) e
+    )
+  }
+  # The item already exists, so deploying again only adds another revision.
+  result <- deploy()
+  if (is_network_failure(result)) {
+    Sys.sleep(10)
+    result <- deploy()
+  }
   if (inherits(result, "error")) {
     detail <- squish_scrub(conditionMessage(result), cloud_secrets(cld))
+    network <- is_network_failure(result)
     cli::cli_abort(
       c(
-        "Deploying to Posit Connect Cloud item {.val {cloud_id}} failed.",
+        if (network) {
+          "Couldn't reach Posit Connect Cloud to deploy item {.val {cloud_id}}, even after a retry."
+        } else {
+          "Deploying to Posit Connect Cloud item {.val {cloud_id}} failed."
+        },
         "x" = "{detail}",
         "i" = if (first_deploy) {
-          "The item was created. To retry, pass {.code cloud_id = \"{cloud_id}\"}."
+          paste(
+            "The item was created but holds no working version yet. To finish, run the",
+            "deploy again as an update of that item:",
+            "{.code deploy_bundle(guid, cloud_id = \"{cloud_id}\")}"
+          )
+        } else {
+          "To retry, run the same update again."
         }
       ),
-      class = c("phsdeploy_deploy_failed", "phsdeploy_error"),
+      class = c(
+        if (network) "phsdeploy_cloud_unreachable",
+        "phsdeploy_deploy_failed", "phsdeploy_error"
+      ),
       cloud_id = cloud_id
     )
   }
