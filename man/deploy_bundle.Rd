@@ -12,7 +12,8 @@ deploy_bundle(
   domain_id = NULL,
   name = NULL,
   client = phs_connect_int(),
-  cld = NULL
+  cld = NULL,
+  collaborators = character()
 )
 }
 \arguments{
@@ -39,13 +40,22 @@ so the address is \verb{https://<name>.<domain>}.}
 
 \item{cld}{A Connect Cloud connection from \code{\link[=phs_connect_cld]{phs_connect_cld()}}, or \code{NULL}
 to connect with the credential in the environment.}
+
+\item{collaborators}{Cloud user ids to make collaborators on the item, so
+they can update it too: normally every deployer, from
+\code{\link[=match_cloud_users]{match_cloud_users()}}. On a first deploy they are added as soon as the
+item exists. On an update, any who are missing are added. Nobody is
+removed. A collaborator who can't be added is reported in the result,
+not an error.}
 }
 \value{
 A list with \code{guid}, \code{bundle_id}, \code{sha256}, \code{cloud_id},
 \code{first_deploy}, \code{title}, \code{access}, \code{domain_id}, \code{name}, \code{url} (the custom
 address, or \code{NA}), \code{default_url} (Cloud's own address for the item,
-\verb{https://<id>.share.connect.posit.cloud}), \code{private_link_enabled} and
-\code{repo_changes} (from the manifest rewrite).
+\verb{https://<id>.share.connect.posit.cloud}), \code{private_link_enabled},
+\code{repo_changes} (from the manifest rewrite), \code{collaborators_added} (user
+ids) and \code{collaborators_failed} (a data frame, as from
+\code{\link[=cloud_sync_collaborators]{cloud_sync_collaborators()}}).
 
 Otherwise an error of class \code{phsdeploy_error}. A failed deploy raises
 \code{phsdeploy_deploy_failed} with the item's \code{cloud_id}. If this call created
@@ -76,6 +86,14 @@ After deploying, the item is read back. Its address and access must be
 what they were (or, for a first deploy, what was asked for), otherwise an
 error is raised.
 }
+\section{Progress}{
+
+Each step is announced with a message of class \code{phsdeploy_progress}, with
+fields \code{step} (\code{"connect"}, \code{"download"}, \code{"create"}, \code{"collaborators"},
+\code{"deploy"}, \code{"check"} or \code{"done"}) and \code{detail}. Catch them with
+\code{withCallingHandlers()} to record progress, for example in an app.
+}
+
 \section{Running several deploys}{
 
 rsconnect needs the Cloud account registered on disk to deploy. This

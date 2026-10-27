@@ -34,12 +34,20 @@
 #'   `phs_connect_int()`.
 #' @param cld A Connect Cloud connection from [phs_connect_cld()], or `NULL`
 #'   to connect with the credential in the environment.
+#' @param collaborators Cloud user ids to make collaborators on the item, so
+#'   they can update it too: normally every deployer, from
+#'   [match_cloud_users()]. On a first deploy they are added as soon as the
+#'   item exists. On an update, any who are missing are added. Nobody is
+#'   removed. A collaborator who can't be added is reported in the result,
+#'   not an error.
 #'
 #' @return A list with `guid`, `bundle_id`, `sha256`, `cloud_id`,
 #'   `first_deploy`, `title`, `access`, `domain_id`, `name`, `url` (the custom
 #'   address, or `NA`), `default_url` (Cloud's own address for the item,
-#'   `https://<id>.share.connect.posit.cloud`), `private_link_enabled` and
-#'   `repo_changes` (from the manifest rewrite).
+#'   `https://<id>.share.connect.posit.cloud`), `private_link_enabled`,
+#'   `repo_changes` (from the manifest rewrite), `collaborators_added` (user
+#'   ids) and `collaborators_failed` (a data frame, as from
+#'   [cloud_sync_collaborators()]).
 #'
 #'   Otherwise an error of class `phsdeploy_error`. A failed deploy raises
 #'   `phsdeploy_deploy_failed` with the item's `cloud_id`. If this call created
@@ -47,6 +55,12 @@
 #'   finishes it as an update rather than creating another. A network failure
 #'   is retried once before it is reported, with the extra class
 #'   `phsdeploy_cloud_unreachable`.
+#'
+#' @section Progress:
+#' Each step is announced with a message of class `phsdeploy_progress`, with
+#' fields `step` (`"connect"`, `"download"`, `"create"`, `"collaborators"`,
+#' `"deploy"`, `"check"` or `"done"`) and `detail`. Catch them with
+#' `withCallingHandlers()` to record progress, for example in an app.
 #'
 #' @section Running several deploys:
 #' rsconnect needs the Cloud account registered on disk to deploy. This
@@ -57,8 +71,10 @@
 #' @export
 deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
                           domain_id = NULL, name = NULL,
-                          client = phs_connect_int(), cld = NULL) {
+                          client = phs_connect_int(), cld = NULL,
+                          collaborators = character()) {
   check_guid(guid)
+  check_cloud_user_ids(collaborators)
   first_deploy <- is.null(cloud_id)
   if (!first_deploy) {
     check_content_id(cloud_id)
@@ -81,13 +97,16 @@ deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
   # Registered after the temporary folder, so it runs before the folder is
   # removed.
   withr::defer(close_new_connections(connections_before))
+  deploy_progress("connect", "Connecting to Posit Connect Cloud.")
   cld <- cld %||% phs_connect_cld()
   check_cld(cld)
+  deploy_progress("download", paste("Downloading and preparing the bundle of", guid))
   prepared <- prepare_bundle(guid, bundle_id, work, client)
 
   if (first_deploy) {
     title <- title %||% get_int_content(guid, client)$title
     domain <- find_domain(cld, domain_id)
+    deploy_progress("create", paste0("Creating the Cloud item \"", title, "\"."))
     cloud_id <- create_cloud_item(cld, title, prepared$target, domain, name)
     expected <- list(vanity_name = name %||% NA_character_, domain_id = domain_id %||% NA_character_)
   } else {
@@ -104,11 +123,20 @@ deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
     name <- before$vanity_name
   }
 
+  synced <- list(added = character(), failed = data.frame(user_id = character(), action = character(), reason = character()))
+  if (length(collaborators)) {
+    deploy_progress("collaborators", paste("Checking", length(collaborators), "collaborator(s) on", cloud_id))
+    synced <- cloud_sync_collaborators(cld, cloud_id, collaborators)
+  }
+
+  deploy_progress("deploy", paste("Deploying to Cloud item", cloud_id))
   local_cloud_registration(cld)
   run_deploy(cld, prepared$app_dir, cloud_id, title, work, first_deploy)
+  deploy_progress("check", "Checking the item's address and access.")
   after <- cloud_get_content(cld, cloud_id)
   if (is.null(after)) abort_missing_item(cloud_id)
   check_deployed_item(after, expected, first_deploy)
+  deploy_progress("done", paste("Deployed bundle", prepared$bundle$bundle_id, "to", cloud_id))
 
   list(
     guid = guid,
@@ -123,8 +151,21 @@ deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
     url = if (is.null(domain)) NA_character_ else cloud_public_url(domain, name),
     default_url = flat_chr(after$current_revision$url),
     private_link_enabled = isTRUE(after$private_link_enabled),
-    repo_changes = prepared$changes
+    repo_changes = prepared$changes,
+    collaborators_added = synced$added,
+    collaborators_failed = synced$failed
   )
+}
+
+#' Announce a step of a deploy
+#'
+#' @param step A short step name, such as `"deploy"`.
+#' @param detail What is happening, for a person to read.
+#' @return `NULL`, invisibly.
+#' @noRd
+deploy_progress <- function(step, detail) {
+  rlang::inform(detail, class = "phsdeploy_progress", step = step, detail = detail)
+  invisible()
 }
 
 #' Download, unpack and rewrite a bundle, ready for Connect Cloud
