@@ -49,7 +49,7 @@ a credential an app stores for each user.
 |----|----|
 | Connecting | `phs_connect_int()`, `phs_connect_cld()` |
 | Internal content | `list_int_content()`, `get_int_content()`, `get_int_content_bundles()` |
-| Internal access and groups | `int_list_access()`, `int_add_group_access()`, `int_remove_access()`, `int_find_group()`, `int_group_members()` |
+| Internal access and groups | `int_list_access()`, `int_list_people()`, `int_add_group_access()`, `int_remove_access()`, `int_find_group()`, `int_group_members()` |
 | Internal tags | `int_list_tags()`, `int_content_tags()`, `int_add_tag()`, `int_remove_tag()` |
 | Deploying to Cloud | `deploy_bundle()` |
 | Cloud items | `cloud_list_content()`, `cloud_get_content()`, `cloud_set_access()`, `cloud_set_details()`, `cloud_rename_address()`, `cloud_delete_content()` |

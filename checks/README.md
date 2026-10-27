@@ -46,7 +46,7 @@ If a first deploy fails part-way (for example on a network timeout), run the sam
 | `09-make-public.R` | Going public, then an update while live stays public | Public for the length of the check |
 | `10-rename-address.R` | Renaming a live product's address, and renaming it back | Public, and under a second name, for the length of the check |
 | `11-private-link.R` | Private link sharing: the link form, an update while shared, switching off and on | Sharing on for the length of the check, item stays private |
-| `12-internal-handover.R` | Content listing, a group as viewer then collaborator on the test app, group members, tags | The test group is on the test app's access list for the length of the check |
+| `12-internal-handover.R` | Content listing, a group as viewer then collaborator on the test app, the access list by name, group members, tags | The test group is on the test app's access list for the length of the check |
 | `13-cloud-collaborators.R` | Your Cloud role, the account's users, the deployer group matched by email, and (with a colleague's email) adding and removing a collaborator | With `PHSDEPLOY_CHECK_CLOUD_USER`, that colleague is a collaborator for the length of the check |
 | `14-delete.R` | Deletes everything the checks created | Removes all the items created |
 | `15-shinyapps.R` | The shinyapps.io account's apps, read only. Needs the `PHSDEPLOY_SIO_*` variables | Nothing |

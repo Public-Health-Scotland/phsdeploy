@@ -68,6 +68,50 @@ int_list_access <- function(client = phs_connect_int(), guid) {
   out
 }
 
+#' Everyone with access to an internal item, by name
+#'
+#' The item's owner and its access list, with each user's or group's name,
+#' for showing who can change and who can view an item. Each user and group
+#' is looked up once. One that can't be read keeps its GUID as its name.
+#'
+#' @inheritParams int_list_access
+#'
+#' @return A data frame with one row per person or group: `principal_guid`,
+#'   `principal_type` (`user` or `group`), `role` (`owner`, `collaborator`
+#'   or `viewer`), `name` (a username or group name) and `email` (`NA` for
+#'   groups), owner first.
+#'
+#'   Otherwise an error of class `phsdeploy_int_http_error`.
+#' @export
+int_list_people <- function(client = phs_connect_int(), guid) {
+  check_guid(guid)
+  item <- int_call(client, "GET", paste0("v1/content/", guid))
+  access <- int_list_access(client, guid)
+  out <- data.frame(
+    principal_guid = c(flat_chr(item$owner_guid), access$principal_guid),
+    principal_type = c("user", access$principal_type),
+    role = c("owner", access$role),
+    stringsAsFactors = FALSE
+  )
+  out <- out[!is.na(out$principal_guid), , drop = FALSE]
+  details <- lapply(seq_len(nrow(out)), function(i) {
+    path <- paste0("v1/", if (out$principal_type[[i]] == "group") "groups/" else "users/", out$principal_guid[[i]])
+    record <- tryCatch(int_call(client, "GET", path), phsdeploy_int_http_error = function(e) NULL)
+    if (is.null(record)) {
+      return(c(out$principal_guid[[i]], NA_character_))
+    }
+    if (out$principal_type[[i]] == "group") {
+      c(flat_chr(record$name), NA_character_)
+    } else {
+      c(flat_chr(record$username), flat_chr(record$email))
+    }
+  })
+  out$name <- vapply(details, `[[`, character(1), 1)
+  out$email <- vapply(details, `[[`, character(1), 2)
+  rownames(out) <- NULL
+  out
+}
+
 #' Give a group access to an internal item
 #'
 #' Adds the group to the item's access list, or changes its role if it is

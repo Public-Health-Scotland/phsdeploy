@@ -1,6 +1,7 @@
 # phsdeploy (development version)
 
 * New `sio_list_apps()` lists the apps on the shinyapps.io account, read only, while they move to Connect Cloud. It reads `PHSDEPLOY_SIO_ACCOUNT`, `PHSDEPLOY_SIO_TOKEN` and `PHSDEPLOY_SIO_SECRET`, through `phsdeploy_config("sio")`, or takes values from `phsdeploy_sio_config()`.
+* New `int_list_people()` lists an internal item's owner and access list, with each user's and group's name.
 * New check: `15-shinyapps.R`.
 
 # phsdeploy 0.1.0

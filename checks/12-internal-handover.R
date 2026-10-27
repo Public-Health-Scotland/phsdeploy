@@ -38,9 +38,11 @@ if (!identical(access$role[access$principal_guid %in% group$guid], "viewer")) st
 promoted <- int_add_group_access(client, guid, group$guid)
 access <- int_list_access(client, guid)
 if (!identical(access$role[access$principal_guid %in% group$guid], "collaborator")) stop("The group isn't a collaborator.")
+people <- int_list_people(client, guid)
+if (!identical(people$role[[1]], "owner") || !group$name %in% people$name) stop("The people list is missing the owner or the group.")
 again <- int_add_group_access(client, guid, group$guid)
 if (again$changed) stop("Adding the group a second time changed something.")
-check_ok("Viewer, then collaborator. Adding it again changed nothing.")
+check_ok("Viewer, then collaborator, and listed by name with the owner. Adding it again changed nothing.")
 
 check_step("Remove the group")
 int_remove_access(client, guid, promoted$permission_id)
