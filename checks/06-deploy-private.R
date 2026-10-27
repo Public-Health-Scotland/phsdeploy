@@ -6,7 +6,7 @@
 #
 # Needs: 02-publish-internal.R.
 #
-# Changes: creates one private Cloud item (removed by 12-delete.R).
+# Changes: creates one private Cloud item (removed by 14-delete.R).
 
 source("checks/_helpers.R")
 

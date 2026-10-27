@@ -21,7 +21,7 @@ Or all of them in order, without questions:
 
 ```r
 Sys.setenv(PHSDEPLOY_CHECK_CONFIRM = "yes")
-for (check in sprintf("checks/%02d-*.R", 0:12)) source(Sys.glob(check))
+for (check in sprintf("checks/%02d-*.R", 0:14)) source(Sys.glob(check))
 ```
 
 ## What you'll see
@@ -46,7 +46,11 @@ If a first deploy fails part-way (for example on a network timeout), run the sam
 | `09-make-public.R` | Going public, then an update while live stays public | Public for the length of the check |
 | `10-rename-address.R` | Renaming a live product's address, and renaming it back | Public, and under a second name, for the length of the check |
 | `11-private-link.R` | Private link sharing: the link form, an update while shared, switching off and on | Sharing on for the length of the check, item stays private |
-| `12-delete.R` | Deletes everything the checks created | Removes all the items created |
+| `12-internal-handover.R` | Content listing, a group as viewer then collaborator on the test app, group members, tags | The test group is on the test app's access list for the length of the check |
+| `13-cloud-collaborators.R` | Your Cloud role, the account's users, the deployer group matched by email, and (with a colleague's email) adding and removing a collaborator | With `PHSDEPLOY_CHECK_CLOUD_USER`, that colleague is a collaborator for the length of the check |
+| `14-delete.R` | Deletes everything the checks created | Removes all the items created |
+
+`12` uses the group `PHS-PositConnect-TEST-RM`, or the one named in `PHSDEPLOY_CHECK_GROUP`. `13` matches the group `PHS-PositConnect-PROD-Admin`, or the one in `PHSDEPLOY_CHECK_DEPLOYER_GROUP`, and only changes collaborators when `PHSDEPLOY_CHECK_CLOUD_USER` is set to a colleague's Cloud email, since Cloud doesn't let you add yourself.
 
 `03` accepts any internal content: set `PHSDEPLOY_CHECK_GUID` to try a real product's bundle, then run `04` on it.
 
@@ -63,4 +67,4 @@ Without the Cloud access, `08` stops before creating anything, with an error nam
 - Everything the checks create is titled `phsdeploy check ...`, and `12` deletes only recorded items with that title.
 - The fixed landing-page domain is never used.
 - Bundles, unpacked apps and rsconnect's records go to temporary folders.
-- What the checks create is recorded in a file in `tempdir()`. Restarting R forgets it, so run `12-delete.R` before or remove leftover `phsdeploy check` items manually.
+- What the checks create is recorded in a file in `tempdir()`. Restarting R forgets it, so run `14-delete.R` before or remove leftover `phsdeploy check` items manually.

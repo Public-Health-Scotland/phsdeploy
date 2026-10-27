@@ -1,4 +1,4 @@
-# Check 12: delete everything the checks created.
+# Check 14: delete everything the checks created.
 #
 # Only items recorded in this R session, whose title starts with
 # "phsdeploy check", are deleted, so nothing else can be removed. Running it
@@ -49,4 +49,4 @@ for (guid in internal_guids) {
 }
 
 unlink(check_state_file)
-check_done(12)
+check_done(14)

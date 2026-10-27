@@ -13,7 +13,7 @@
 # Needs: shiny installed, and bslib and phsshiny for the phsshiny app.
 #
 # Changes: creates one or two items on internal Connect (removed by
-# 12-delete.R, even if a build fails).
+# 14-delete.R, even if a build fails).
 
 source("checks/_helpers.R")
 

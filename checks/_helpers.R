@@ -201,7 +201,7 @@ check_stamp <- function() {
 #' to that existing item instead of creating one.
 #'
 #' With `save_as`, a new item's GUID is recorded as soon as it is created,
-#' before its build finishes, so `12-delete.R` can remove it even if the build
+#' before its build finishes, so `14-delete.R` can remove it even if the build
 #' fails.
 #'
 #' @param client A connectapi client from `phs_connect_int()`.
@@ -237,7 +237,7 @@ check_publish_internal <- function(client, app, title, data_version = 1, guid = 
 #'
 #' Calls `deploy_bundle()`, with its output sent to the log. The item's id is
 #' recorded under `save_as` whether the deploy succeeds or fails after
-#' creating the item, so `12-delete.R` can always remove it.
+#' creating the item, so `14-delete.R` can always remove it.
 #'
 #' If an earlier run recorded an item under `save_as` and it still exists,
 #' this deploys into it as an update instead of creating another. That
