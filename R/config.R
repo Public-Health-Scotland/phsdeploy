@@ -68,6 +68,91 @@ phsdeploy_config <- function(needs = c("int", "cld")) {
   new_phsdeploy_config(int = int, cld = cld)
 }
 
+#' Build a configuration from values
+#'
+#' The same settings as [phsdeploy_config()], given as values instead of read
+#' from environment variables. Use these when a credential comes from
+#' somewhere else, such as an app's own store of each user's credential.
+#' Values are cleaned in the same way: surrounding spaces and quotes are
+#' removed, and a trailing `/` from the URL.
+#'
+#' Printing the result never shows the key or the client secret.
+#'
+#' @param url The internal Connect server's URL.
+#' @param key An API key for that server.
+#' @param account The Connect Cloud account name.
+#' @param client_id,client_secret A Connect Cloud credential with access to
+#'   that account.
+#'
+#' @return An object of class `phsdeploy_config`, with an `int` part from
+#'   `phsdeploy_int_config()` or a `cld` part from `phsdeploy_cld_config()`.
+#'
+#'   If a value is missing or invalid, an error of class
+#'   `phsdeploy_config_error`, with `missing` and `invalid` fields naming the
+#'   arguments.
+#'
+#' @export
+#' @examples
+#' \dontrun{
+#' config <- phsdeploy_cld_config("phs", client_id, client_secret)
+#' cld <- phs_connect_cld(config)
+#' }
+phsdeploy_cld_config <- function(account, client_id, client_secret) {
+  values <- list(
+    account = config_arg(account),
+    client_id = config_arg(client_id),
+    client_secret = config_arg(client_secret)
+  )
+  missing <- names(values)[vapply(values, is.null, logical(1))]
+  if (length(missing)) abort_config_args(missing, character())
+  new_phsdeploy_config(cld = values)
+}
+
+#' @rdname phsdeploy_cld_config
+#' @export
+phsdeploy_int_config <- function(url, key) {
+  values <- list(url = config_arg(url, url = TRUE), key = config_arg(key))
+  missing <- names(values)[vapply(values, is.null, logical(1))]
+  invalid <- if (!is.null(values$url) && !grepl("^https?://", values$url)) "url" else character()
+  if (length(missing) || length(invalid)) abort_config_args(missing, invalid)
+  new_phsdeploy_config(int = values)
+}
+
+#' Clean a config value given as an argument
+#'
+#' @param x The value.
+#' @param url `TRUE` if the value is a URL.
+#' @return The cleaned value, or `NULL` if it isn't one non-empty string.
+#' @noRd
+config_arg <- function(x, url = FALSE) {
+  if (!rlang::is_string(x)) {
+    return(NULL)
+  }
+  value <- clean_value(x, url)
+  if (nzchar(value)) value
+}
+
+#' Raise a config error for values given as arguments
+#'
+#' @param missing Names of the missing arguments.
+#' @param invalid Names of the invalid arguments.
+#' @param call The environment of the calling function, shown in the error.
+#' @return Does not return, raises an error of class `phsdeploy_config_error`.
+#' @noRd
+abort_config_args <- function(missing, invalid, call = rlang::caller_env()) {
+  cli::cli_abort(
+    c(
+      "The phsdeploy configuration is incomplete.",
+      if (length(missing)) c("x" = "Missing or empty: {.arg {missing}}."),
+      if (length(invalid)) c("x" = "{.arg {invalid}} must start with {.code http://} or {.code https://}.")
+    ),
+    class = c("phsdeploy_config_error", "phsdeploy_error"),
+    missing = missing,
+    invalid = invalid,
+    call = call
+  )
+}
+
 #' Internal constructor for `phsdeploy_config` objects
 #'
 #' A `phsdeploy_config` is a plain list with a class attribute. Only the parts

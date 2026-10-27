@@ -8,7 +8,8 @@ phs_connect_cld(config = phsdeploy_config("cld"))
 }
 \arguments{
 \item{config}{A \code{phsdeploy_config} with a \code{cld} part, by default read from
-the environment with \code{phsdeploy_config("cld")}.}
+the environment with \code{phsdeploy_config("cld")}. Use
+\code{\link[=phsdeploy_cld_config]{phsdeploy_cld_config()}} to connect with a credential from elsewhere.}
 }
 \value{
 An object of class \code{phsdeploy_cld} with \code{server}, \code{account},

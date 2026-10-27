@@ -8,7 +8,8 @@ phs_connect_int(config = phsdeploy_config("int"))
 }
 \arguments{
 \item{config}{A \code{phsdeploy_config} with an \code{int} part, by default read from
-the environment with \code{phsdeploy_config("int")}.}
+the environment with \code{phsdeploy_config("int")}, or built with
+\code{\link[=phsdeploy_int_config]{phsdeploy_int_config()}}.}
 }
 \value{
 A connectapi \code{Connect} object.

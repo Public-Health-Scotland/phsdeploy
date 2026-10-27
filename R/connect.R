@@ -3,11 +3,13 @@
 #' Creates a connectapi client object.
 #'
 #' @param config A `phsdeploy_config` with an `int` part, by default read from
-#'   the environment with `phsdeploy_config("int")`.
+#'   the environment with `phsdeploy_config("int")`, or built with
+#'   [phsdeploy_int_config()].
 #'
 #' @return A connectapi `Connect` object.
 #' @export
 phs_connect_int <- function(config = phsdeploy_config("int")) {
+  check_config_part(config, "int")
   connectapi::connect(
     server = config$int$url,
     api_key = config$int$key
@@ -26,7 +28,8 @@ phs_connect_int <- function(config = phsdeploy_config("int")) {
 #' [deploy_bundle()] does for itself, in a temporary folder of its own.
 #'
 #' @param config A `phsdeploy_config` with a `cld` part, by default read from
-#'   the environment with `phsdeploy_config("cld")`.
+#'   the environment with `phsdeploy_config("cld")`. Use
+#'   [phsdeploy_cld_config()] to connect with a credential from elsewhere.
 #'
 #' @return An object of class `phsdeploy_cld` with `server`, `account`,
 #'   `account_id`, `client_id` and `client_secret`. Printing never shows the
