@@ -28,7 +28,7 @@ bundle.}
 title. Not used for an update, which keeps the item's own title.}
 
 \item{domain_id}{For a first deploy only: a domain id from
-\code{cloud_list_domains()} (internal) for a custom address, or \code{NULL} for
+\code{\link[=cloud_list_domains]{cloud_list_domains()}} for a custom address, or \code{NULL} for
 Cloud's default address.}
 
 \item{name}{For a first deploy on a wildcard domain only: the custom name,
@@ -68,8 +68,8 @@ it. New items are always private.
 address, title and access are kept, so a live product stays live.
 }
 
-Making a product public is a separate step, done with \code{cloud_set_access()}
-(internal) at its release time, or straight after the first deploy for a
+Making a product public is a separate step, done with \code{\link[=cloud_set_access]{cloud_set_access()}}
+at its release time, or straight after the first deploy for a
 product going straight to live.
 
 After deploying, the item is read back. Its address and access must be

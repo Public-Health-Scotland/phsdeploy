@@ -17,13 +17,13 @@ cloud_private_link_param <- "private_link_token"
 #' interface sends. Switching it off keeps the item's token, but the link no
 #' longer works. The item is read back to check the change took.
 #'
-#' @param cld A `phsdeploy_cld` connection.
+#' @param cld A Connect Cloud connection from [phs_connect_cld()].
 #' @param id The Cloud item's id.
 #' @param enabled `TRUE` to switch sharing on, `FALSE` to switch it off.
 #' @return `TRUE`, invisibly. Otherwise an error of class
 #'   `phsdeploy_bad_argument`, `phsdeploy_missing_item` or
 #'   `phsdeploy_private_link_unchanged`.
-#' @noRd
+#' @export
 cloud_set_private_link <- function(cld, id, enabled) {
   check_cld(cld)
   check_content_id(id)
@@ -57,7 +57,7 @@ cloud_set_private_link <- function(cld, id, enabled) {
 #' shows it when printed. Use `$url` to pass it on, and never write it to a
 #' log.
 #'
-#' @param cld A `phsdeploy_cld` connection.
+#' @param cld A Connect Cloud connection from [phs_connect_cld()].
 #' @param id The Cloud item's id.
 #' @param enable `TRUE` to switch sharing on first if needed. With `FALSE`,
 #'   sharing must already be on.
@@ -65,7 +65,7 @@ cloud_set_private_link <- function(cld, id, enabled) {
 #'   `cloud_id`, `url` (the private link) and `base_url` (the item's address
 #'   without the token). Otherwise an error of class
 #'   `phsdeploy_private_link_off` or `phsdeploy_private_link_missing`.
-#' @noRd
+#' @export
 cloud_private_link <- function(cld, id, enable = TRUE) {
   check_cld(cld)
   check_content_id(id)

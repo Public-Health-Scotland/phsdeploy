@@ -10,7 +10,7 @@
 #' check the change took. Cloud only accepts a name together with its domain,
 #' so both are sent.
 #'
-#' @param cld A `phsdeploy_cld` connection.
+#' @param cld A Connect Cloud connection from [phs_connect_cld()].
 #' @param id The Cloud item's id.
 #' @param name The new custom name, a lowercase DNS label.
 #' @param confirm `TRUE` to confirm the old address may stop working.
@@ -19,7 +19,7 @@
 #'   class `phsdeploy_rename_not_confirmed`, `phsdeploy_missing_item`,
 #'   `phsdeploy_bad_domain`, `phsdeploy_name_taken` or
 #'   `phsdeploy_address_changed`.
-#' @noRd
+#' @export
 cloud_rename_address <- function(cld, id, name, confirm = FALSE) {
   check_cld(cld)
   check_content_id(id)

@@ -10,8 +10,8 @@
 #' * **Update** (`cloud_id` given): deploys into the existing item. Its
 #'   address, title and access are kept, so a live product stays live.
 #'
-#' Making a product public is a separate step, done with `cloud_set_access()`
-#' (internal) at its release time, or straight after the first deploy for a
+#' Making a product public is a separate step, done with [cloud_set_access()]
+#' at its release time, or straight after the first deploy for a
 #' product going straight to live.
 #'
 #' After deploying, the item is read back. Its address and access must be
@@ -26,7 +26,7 @@
 #' @param title The item's title on a first deploy, by default the internal
 #'   title. Not used for an update, which keeps the item's own title.
 #' @param domain_id For a first deploy only: a domain id from
-#'   `cloud_list_domains()` (internal) for a custom address, or `NULL` for
+#'   [cloud_list_domains()] for a custom address, or `NULL` for
 #'   Cloud's default address.
 #' @param name For a first deploy on a wildcard domain only: the custom name,
 #'   so the address is `https://<name>.<domain>`.

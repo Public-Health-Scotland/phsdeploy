@@ -536,13 +536,14 @@ cloud_account_of <- function(cld) {
 
 # Content ----------------------------------------------------------------------
 
-#' Get one content item
+#' Get one Connect Cloud item
 #'
-#' @param cld A `phsdeploy_cld` connection.
-#' @param id Content id.
-#' @return The item as a list, with secret-like fields removed, or `NULL` if
-#'   Cloud answers 404 or the item is pending deletion (`state` `"deleted"`).
-#' @noRd
+#' @param cld A Connect Cloud connection from [phs_connect_cld()].
+#' @param id The Cloud item's id.
+#' @return The item as a list, as the API returns it, without its private
+#'   link token or secrets. `NULL` if the item doesn't exist or is pending
+#'   deletion.
+#' @export
 cloud_get_content <- function(cld, id) {
   check_cld(cld)
   check_content_id(id)
@@ -593,7 +594,7 @@ cloud_name_in_use <- function(cld, name, domain_id) {
   check_cld(cld)
   check_string_arg(name, "name")
   check_domain_id(domain_id)
-  found <- cloud_account_contents(cld)
+  found <- cloud_list_content(cld)
   any(!is.na(found$vanity_name) & tolower(found$vanity_name) == tolower(name) &
     !is.na(found$domain_id) & found$domain_id == domain_id)
 }
@@ -609,16 +610,26 @@ cloud_name_in_use <- function(cld, name, domain_id) {
 cloud_contents_on_domain <- function(cld, domain_id) {
   check_cld(cld)
   check_domain_id(domain_id)
-  found <- cloud_account_contents(cld)
+  found <- cloud_list_content(cld)
   found$id[!is.na(found$domain_id) & found$domain_id == domain_id & !is.na(found$id)]
 }
 
-#' All of the account's live content
+#' List the Connect Cloud account's items
 #'
-#' @param cld A `phsdeploy_cld` connection.
-#' @return A data frame as from `content_frame()`.
-#' @noRd
-cloud_account_contents <- function(cld) {
+#' @inheritParams cloud_get_content
+#' @return A data frame with one row per item, leaving out items pending
+#'   deletion: `id`, `title`, `description`, `access`, `private_link_enabled`
+#'   (logical), `vanity_name`, `domain_id`, `author_id`, `url` (Cloud's own
+#'   address for the item), `state`, `created_time` and `updated_time`, all
+#'   character except `private_link_enabled`.
+#' @export
+#' @examples
+#' \dontrun{
+#' cld <- phs_connect_cld()
+#' cloud_list_content(cld)
+#' }
+cloud_list_content <- function(cld) {
+  check_cld(cld)
   records <- cloud_get_pages(cld, "/contents", query = list(account_id = cloud_account_of(cld)))
   content_frame(records)
 }
@@ -628,18 +639,24 @@ cloud_account_contents <- function(cld) {
 #' One row per record, with items pending deletion dropped.
 #'
 #' @param records A list of content records from the API.
-#' @return A data frame with `id`, `title`, `access`, `vanity_name`,
-#'   `domain_id` and `state`, all character, with `NA` for missing values.
+#' @return A data frame with the columns described in [cloud_list_content()],
+#'   with `NA` for missing values.
 #' @noRd
 content_frame <- function(records) {
   records <- lapply(records, strip_record)
   out <- data.frame(
     id = pluck_chr(records, "id"),
     title = pluck_chr(records, "title"),
+    description = pluck_chr(records, "description"),
     access = pluck_chr(records, "access"),
+    private_link_enabled = vapply(records, function(r) isTRUE(r$private_link_enabled), logical(1)),
     vanity_name = pluck_chr(records, "vanity_name"),
     domain_id = pluck_chr(records, "domain_id"),
+    author_id = pluck_chr(records, "author_id"),
+    url = vapply(records, function(r) flat_chr(r$current_revision$url), character(1)),
     state = pluck_chr(records, "state"),
+    created_time = pluck_chr(records, "created_time"),
+    updated_time = pluck_chr(records, "updated_time"),
     stringsAsFactors = FALSE
   )
   out <- out[is.na(out$state) | out$state != "deleted", , drop = FALSE]
@@ -736,22 +753,23 @@ name_taken_class <- function(status, detail) {
   if (taken) "phsdeploy_name_taken"
 }
 
-#' Set who can see a content item
+#' Set who can see a Connect Cloud item
 #'
-#' Content deployed to Connect Cloud defaults to private, and a deployment doesn't
-#' change this. The rsconnect `deployApp(appVisibility =)` only applies during a
-#' deploy, which is why this direct call is required.This means setting a product
-#' to be public is its own step, separate from the deployment process. A product
-#' that needs to be public at release time must invoke this method immediately after
-#' deployment, otherwise changing from private to public can be handled on its own
-#' schedule.
+#' Content deployed to Connect Cloud starts private, and deploying never
+#' changes its access. So making a product public is its own step: straight
+#' after the first deploy for a product going live at once, or at its release
+#' time.
 #'
-#' @param cld A `phsdeploy_cld` connection.
-#' @param id Content id.
-#' @param access One of `cloud_access_values`.
+#' @inheritParams cloud_get_content
+#' @param access One of `"private"`, `"view_team_edit_private"`,
+#'   `"view_team_edit_team"`, `"view_public_edit_team"` or `"public"`.
 #' @return `TRUE`, invisibly. Otherwise an error of class `phsdeploy_bad_access`
 #'   (before any request) or `phsdeploy_cloud_http_error`.
-#' @noRd
+#' @export
+#' @examples
+#' \dontrun{
+#' cloud_set_access(cld, id, "public")
+#' }
 cloud_set_access <- function(cld, id, access) {
   check_cld(cld)
   check_content_id(id)
@@ -765,26 +783,38 @@ cloud_set_access <- function(cld, id, access) {
   invisible(TRUE)
 }
 
-#' Delete a content item
+#' Delete a Connect Cloud item
 #'
-#' Sends `DELETE /contents/{id}`. An item that is already gone (a 404, or
-#' pending deletion) counts as success and is reported with a message of class
-#' `phsdeploy_already_deleted`.
+#' Deleting can't be undone, and every link to the item stops working, so it
+#' is refused unless `confirm = TRUE`. The internal item it came from is never
+#' touched. An item that is already gone counts as success and is reported
+#' with a message of class `phsdeploy_already_deleted`.
 #'
-#' @param cld A `phsdeploy_cld` connection.
-#' @param id Content id.
+#' @inheritParams cloud_get_content
+#' @param confirm `TRUE` to confirm the item should be deleted.
 #' @return `TRUE`, invisibly. Otherwise an error of class
-#'   `phsdeploy_cloud_delete_error`.
-#' @noRd
-cloud_delete_content <- function(cld, id) {
+#'   `phsdeploy_delete_not_confirmed` or `phsdeploy_cloud_delete_error`.
+#' @export
+cloud_delete_content <- function(cld, id, confirm = FALSE) {
   check_cld(cld)
   check_content_id(id)
-  if (is.null(cloud_get_content(cld, id))) {
+  item <- cloud_get_content(cld, id)
+  if (is.null(item)) {
     cli::cli_inform(
       "Content {.val {id}} was already gone from Posit Connect Cloud.",
       class = "phsdeploy_already_deleted"
     )
     return(invisible(TRUE))
+  }
+  if (!isTRUE(confirm)) {
+    cli::cli_abort(
+      c(
+        "Deleting removes Cloud item {.val {item$title}} ({.val {id}}) for good.",
+        "!" = "Every link to it will stop working. The internal item is not affected.",
+        "i" = "If that is intended, run again with {.code confirm = TRUE}."
+      ),
+      class = c("phsdeploy_delete_not_confirmed", "phsdeploy_error")
+    )
   }
   result <- tryCatch(
     cloud_call(cld, "DELETE", paste0("/contents/", id), allow = 404L),
@@ -800,18 +830,63 @@ cloud_delete_content <- function(cld, id) {
   invisible(TRUE)
 }
 
+#' Change a Connect Cloud item's title or description
+#'
+#' Only the values given are changed. The item is read back to check the
+#' change took.
+#'
+#' @inheritParams cloud_get_content
+#' @param title The new title, or `NULL` to leave it.
+#' @param description The new description, or `NULL` to leave it. `""`
+#'   clears it.
+#' @return The updated item, as from [cloud_get_content()], invisibly.
+#'   Otherwise an error of class `phsdeploy_bad_argument`,
+#'   `phsdeploy_missing_item`, `phsdeploy_details_unchanged` or
+#'   `phsdeploy_cloud_http_error`.
+#' @export
+cloud_set_details <- function(cld, id, title = NULL, description = NULL) {
+  check_cld(cld)
+  check_content_id(id)
+  if (!is.null(title)) check_string_arg(title, "title")
+  if (!is.null(description) && !rlang::is_string(description)) {
+    cli::cli_abort(
+      "{.arg description} must be a single string.",
+      class = c("phsdeploy_bad_argument", "phsdeploy_error")
+    )
+  }
+  if (is.null(title) && is.null(description)) {
+    cli::cli_abort(
+      "Give a {.arg title}, a {.arg description}, or both.",
+      class = c("phsdeploy_bad_argument", "phsdeploy_error")
+    )
+  }
+  cloud_call(cld, "PATCH", paste0("/contents/", id), body = list(title = title, description = description))
+  after <- cloud_get_content(cld, id)
+  if (is.null(after)) abort_missing_item(id)
+  wrong <- (!is.null(title) && !identical(after$title, title)) ||
+    (!is.null(description) && !identical(after$description %||% "", description))
+  if (wrong) {
+    cli::cli_abort(
+      "Cloud item {.val {id}} doesn't show the new details after the change.",
+      class = c("phsdeploy_details_unchanged", "phsdeploy_error"),
+      cloud_id = id
+    )
+  }
+  invisible(after)
+}
+
 # Domains ----------------------------------------------------------------------
 
-#' List the account's custom domains
+#' List the Connect Cloud account's custom domains
 #'
 #' `name` is the hostname, without any `*.` prefix. A wildcard domain and a
 #' fixed domain can share a `name`, so always identify a domain by `id`, or by
 #' `name` together with `wildcard`.
 #'
-#' @param cld A `phsdeploy_cld` connection.
+#' @inheritParams cloud_get_content
 #' @return A data frame with `id`, `name`, `status` (character), `wildcard`
 #'   (logical, `NA` if missing) and `content_count` (integer).
-#' @noRd
+#' @export
 cloud_list_domains <- function(cld) {
   check_cld(cld)
   records <- cloud_get_pages(cld, "/domains", query = list(account_id = cloud_account_of(cld)))
@@ -837,11 +912,13 @@ cloud_list_domains <- function(cld) {
 #' domain it is `https://<hostname>` and `name` isn't used.
 #'
 #' @param domain One domain, with `name` and `wildcard`: a one-row data frame
-#'   from `cloud_list_domains()`, or a list.
+#'   from [cloud_list_domains()], or a list.
 #' @param name The item's custom name, for a wildcard domain.
 #' @return The address (a string). Otherwise an error of class
 #'   `phsdeploy_bad_domain` or `phsdeploy_bad_name`.
-#' @noRd
+#' @export
+#' @examples
+#' cloud_public_url(list(name = "example.org", wildcard = TRUE), "my-product")
 cloud_public_url <- function(domain, name = NULL) {
   if (is.data.frame(domain)) {
     if (nrow(domain) != 1L) {

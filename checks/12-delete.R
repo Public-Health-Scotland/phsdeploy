@@ -29,7 +29,7 @@ local({
     } else if (!startsWith(item$title %||% "", check_title_prefix)) {
       cli::cli_alert_warning("Skipped Cloud item {.val {id}}: its title isn't a check title.")
     } else {
-      cloud_delete_content(cld, id)
+      cloud_delete_content(cld, id, confirm = TRUE)
       check_ok("Deleted Cloud item {.val {id}}.")
     }
   }
