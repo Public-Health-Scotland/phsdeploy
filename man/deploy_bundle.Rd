@@ -53,9 +53,9 @@ A list with \code{guid}, \code{bundle_id}, \code{sha256}, \code{cloud_id},
 \code{first_deploy}, \code{title}, \code{access}, \code{domain_id}, \code{name}, \code{url} (the custom
 address, or \code{NA}), \code{default_url} (Cloud's own address for the item,
 \verb{https://<id>.share.connect.posit.cloud}), \code{private_link_enabled},
-\code{repo_changes} (from the manifest rewrite), \code{collaborators_added} (user
-ids) and \code{collaborators_failed} (a data frame, as from
-\code{\link[=cloud_sync_collaborators]{cloud_sync_collaborators()}}).
+\code{repo_changes} (from the manifest rewrite), \code{collaborators_added} and
+\code{collaborators_invited} (user ids) and \code{collaborators_failed} (a data
+frame, as from \code{\link[=cloud_sync_collaborators]{cloud_sync_collaborators()}}).
 
 Otherwise an error of class \code{phsdeploy_error}. A failed deploy raises
 \code{phsdeploy_deploy_failed} with the item's \code{cloud_id}. If this call created

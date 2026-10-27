@@ -59,6 +59,9 @@ local({
   check_step("Add them with a sync, then remove them")
   synced <- cloud_sync_collaborators(cld, cloud_id, target$user_id)
   if (nrow(synced$failed)) stop("The sync couldn't add them: ", synced$failed$reason[[1]])
+  if (length(synced$invited)) {
+    stop("They were invited but aren't a member yet, so the invitation needs accepting. Remove it in the Cloud interface if it isn't wanted.")
+  }
   now <- cloud_list_collaborators(cld, cloud_id)
   if (!identical(now$role[now$user_id %in% target$user_id], "collaborator")) stop("They aren't a collaborator after the sync.")
   again <- cloud_sync_collaborators(cld, cloud_id, target$user_id)
@@ -66,7 +69,7 @@ local({
   cloud_remove_collaborator(cld, cloud_id, target$user_id)
   after <- cloud_list_collaborators(cld, cloud_id)
   if (target$user_id %in% after$user_id) stop("They are still a member after removing them.")
-  check_ok("Added, a second sync changed nothing, and removed.")
+  check_ok("Added as a collaborator, a second sync changed nothing, and removed (made a viewer first).")
 })
 
 check_done(13)

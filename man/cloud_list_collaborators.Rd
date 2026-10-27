@@ -34,12 +34,15 @@ add people, never take access away.}
 \value{
 \code{cloud_list_collaborators()} returns a data frame with \code{user_id},
 \code{display_name}, \code{email} and \code{role} (\code{collaborator} or \code{viewer}).
-\code{cloud_add_collaborator()} and \code{cloud_remove_collaborator()} return a list
-with \code{user_id} and \code{changed}, invisibly. Otherwise an error of class
+\code{cloud_add_collaborator()} returns a list with \code{user_id}, \code{changed} and
+\code{status} (\code{"collaborator"}, or \code{"invited"} when the invitation is
+pending), invisibly. \code{cloud_remove_collaborator()} returns a list with
+\code{user_id} and \code{changed}, invisibly. Otherwise an error of class
 \code{phsdeploy_cloud_http_error}.
 
-\code{cloud_sync_collaborators()} returns a list with \code{added} and
-\code{removed} (user ids) and \code{failed}, a data frame of \code{user_id}, \code{action} and
+\code{cloud_sync_collaborators()} returns a list with \code{added},
+\code{invited} (invitations left pending) and \code{removed} (user ids), and
+\code{failed}, a data frame of \code{user_id}, \code{action} and
 \code{reason} for the changes that couldn't be made. Adding yourself is always
 in \code{failed}, since Cloud doesn't allow it: another deployer's sync covers
 it. The item's author is never removed.
@@ -48,9 +51,12 @@ it. The item's author is never removed.
 \itemize{
 \item \code{cloud_list_collaborators()} lists the item's members: its collaborators
 and viewers.
-\item \code{cloud_add_collaborator()} makes a user a collaborator. Cloud adds a
-member as a viewer first, so a new member is added and then promoted.
-\item \code{cloud_remove_collaborator()} removes a user from the item.
+\item \code{cloud_add_collaborator()} makes a user a collaborator. A new member is
+invited as a viewer, as the Cloud interface does, then promoted. If they
+don't appear as a member straight away, the invitation is left pending
+for them to accept, and reported.
+\item \code{cloud_remove_collaborator()} removes a user from the item. Cloud won't
+remove a collaborator, so they are made a viewer first.
 \item \code{cloud_sync_collaborators()} makes the item's collaborators match a list
 of users.
 }

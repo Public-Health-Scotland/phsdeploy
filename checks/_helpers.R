@@ -119,7 +119,7 @@ check_stop_unconfirmed <- function(why) {
 #' @return The value of `expr`.
 check_quietly <- function(label, expr) {
   # Lines already in the log belong to earlier steps.
-  start <- if (file.exists(check_log_file)) length(readLines(check_log_file)) else 0L
+  start <- if (file.exists(check_log_file)) length(readLines(check_log_file, warn = FALSE)) else 0L
   log <- file(check_log_file, open = "a")
   sink(log)
   sinking <- TRUE
@@ -146,7 +146,8 @@ check_quietly <- function(label, expr) {
   sinking <- FALSE
   if (inherits(result, "error")) {
     cli::cli_alert_danger("{label} failed. The last lines it logged:")
-    step_lines <- readLines(check_log_file)[-seq_len(start)]
+    all_lines <- readLines(check_log_file, warn = FALSE)
+    step_lines <- all_lines[seq_along(all_lines) > start]
     cat(utils::tail(step_lines, 20), sep = "\n")
     cli::cli_alert_info("Full log: {.file {check_log_file}}")
     stop(result)

@@ -45,9 +45,9 @@
 #'   `first_deploy`, `title`, `access`, `domain_id`, `name`, `url` (the custom
 #'   address, or `NA`), `default_url` (Cloud's own address for the item,
 #'   `https://<id>.share.connect.posit.cloud`), `private_link_enabled`,
-#'   `repo_changes` (from the manifest rewrite), `collaborators_added` (user
-#'   ids) and `collaborators_failed` (a data frame, as from
-#'   [cloud_sync_collaborators()]).
+#'   `repo_changes` (from the manifest rewrite), `collaborators_added` and
+#'   `collaborators_invited` (user ids) and `collaborators_failed` (a data
+#'   frame, as from [cloud_sync_collaborators()]).
 #'
 #'   Otherwise an error of class `phsdeploy_error`. A failed deploy raises
 #'   `phsdeploy_deploy_failed` with the item's `cloud_id`. If this call created
@@ -123,7 +123,7 @@ deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
     name <- before$vanity_name
   }
 
-  synced <- list(added = character(), failed = data.frame(user_id = character(), action = character(), reason = character()))
+  synced <- list(added = character(), invited = character(), failed = data.frame(user_id = character(), action = character(), reason = character()))
   if (length(collaborators)) {
     deploy_progress("collaborators", paste("Checking", length(collaborators), "collaborator(s) on", cloud_id))
     synced <- cloud_sync_collaborators(cld, cloud_id, collaborators)
@@ -153,6 +153,7 @@ deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
     private_link_enabled = isTRUE(after$private_link_enabled),
     repo_changes = prepared$changes,
     collaborators_added = synced$added,
+    collaborators_invited = synced$invited,
     collaborators_failed = synced$failed
   )
 }

@@ -10,6 +10,13 @@
 #' A Cloud admin can manage the collaborators of an item they aren't on,
 #' except themselves.
 #'
+#' These follow what the Connect Cloud interface sends, since the API's
+#' direct `POST /contents/{id}/users` is refused:
+#' * a user is added by an invitation (`POST /contents/{id}/invitations`) as
+#'   a viewer, then promoted with `PATCH /contents/{id}/users/{user_id}`
+#' * a collaborator can't be removed directly, so they are first changed back
+#'   to a viewer, then removed with `DELETE /contents/{id}/users/{user_id}`
+#'
 #' @name cloud_members
 #' @noRd
 NULL
@@ -55,9 +62,12 @@ cloud_list_users <- function(cld) {
 #'
 #' * `cloud_list_collaborators()` lists the item's members: its collaborators
 #'   and viewers.
-#' * `cloud_add_collaborator()` makes a user a collaborator. Cloud adds a
-#'   member as a viewer first, so a new member is added and then promoted.
-#' * `cloud_remove_collaborator()` removes a user from the item.
+#' * `cloud_add_collaborator()` makes a user a collaborator. A new member is
+#'   invited as a viewer, as the Cloud interface does, then promoted. If they
+#'   don't appear as a member straight away, the invitation is left pending
+#'   for them to accept, and reported.
+#' * `cloud_remove_collaborator()` removes a user from the item. Cloud won't
+#'   remove a collaborator, so they are made a viewer first.
 #' * `cloud_sync_collaborators()` makes the item's collaborators match a list
 #'   of users.
 #'
@@ -69,8 +79,10 @@ cloud_list_users <- function(cld) {
 #'
 #' @return `cloud_list_collaborators()` returns a data frame with `user_id`,
 #'   `display_name`, `email` and `role` (`collaborator` or `viewer`).
-#'   `cloud_add_collaborator()` and `cloud_remove_collaborator()` return a list
-#'   with `user_id` and `changed`, invisibly. Otherwise an error of class
+#'   `cloud_add_collaborator()` returns a list with `user_id`, `changed` and
+#'   `status` (`"collaborator"`, or `"invited"` when the invitation is
+#'   pending), invisibly. `cloud_remove_collaborator()` returns a list with
+#'   `user_id` and `changed`, invisibly. Otherwise an error of class
 #'   `phsdeploy_cloud_http_error`.
 #' @export
 #' @examples
@@ -91,17 +103,54 @@ cloud_add_collaborator <- function(cld, id, user_id) {
   check_cld(cld)
   check_content_id(id)
   check_cloud_user_ids(user_id, single = TRUE)
+  role <- cloud_member_role(cld, id, user_id)
+  if (identical(role, "collaborator")) {
+    return(invisible(list(user_id = user_id, changed = FALSE, status = "collaborator")))
+  }
+  if (is.na(role)) {
+    if (cloud_invitation_pending(cld, id, user_id)) {
+      return(invisible(list(user_id = user_id, changed = FALSE, status = "invited")))
+    }
+    cloud_call(cld, "POST", paste0("/contents/", id, "/invitations"), body = list(
+      message = NA,
+      email_invitations = list(),
+      recipient_invitations = list(list(recipient_id = user_id, role = "viewer"))
+    ))
+    if (is.na(cloud_member_role(cld, id, user_id))) {
+      return(invisible(list(user_id = user_id, changed = TRUE, status = "invited")))
+    }
+  }
+  cloud_call(cld, "PATCH", paste0("/contents/", id, "/users/", user_id), body = list(role = "collaborator"))
+  invisible(list(user_id = user_id, changed = TRUE, status = "collaborator"))
+}
+
+#' Does a user have an unexpired invitation to a Cloud item?
+#'
+#' So a sync doesn't invite someone again while an invitation is waiting.
+#'
+#' @param cld A `phsdeploy_cld` connection.
+#' @param id The Cloud item's id.
+#' @param user_id A Cloud user id.
+#' @return `TRUE` or `FALSE`.
+#' @noRd
+cloud_invitation_pending <- function(cld, id, user_id) {
+  invitations <- cloud_get_pages(cld, paste0("/contents/", id, "/invitations"))
+  any(vapply(invitations, function(i) {
+    identical(flat_chr(i$recipient$id), user_id) && !isTRUE(i$is_expired) && is.null(i$accepted_time)
+  }, logical(1)))
+}
+
+#' A user's role on a Cloud item
+#'
+#' @param cld A `phsdeploy_cld` connection.
+#' @param id The Cloud item's id.
+#' @param user_id A Cloud user id.
+#' @return `"collaborator"`, `"viewer"`, or `NA` if they aren't a member.
+#' @noRd
+cloud_member_role <- function(cld, id, user_id) {
   members <- cloud_list_collaborators(cld, id)
   role <- members$role[members$user_id %in% user_id]
-  if (identical(role, "collaborator")) {
-    return(invisible(list(user_id = user_id, changed = FALSE)))
-  }
-  path <- paste0("/contents/", id, "/users")
-  if (!length(role)) {
-    cloud_call(cld, "POST", path, body = list(user_id = user_id, role = "viewer"))
-  }
-  cloud_call(cld, "PATCH", paste0(path, "/", user_id), body = list(role = "collaborator"))
-  invisible(list(user_id = user_id, changed = TRUE))
+  if (length(role)) role[[1]] else NA_character_
 }
 
 #' @rdname cloud_list_collaborators
@@ -110,8 +159,16 @@ cloud_remove_collaborator <- function(cld, id, user_id) {
   check_cld(cld)
   check_content_id(id)
   check_cloud_user_ids(user_id, single = TRUE)
-  resp <- cloud_call(cld, "DELETE", paste0("/contents/", id, "/users/", user_id), allow = 404L)
-  invisible(list(user_id = user_id, changed = httr2::resp_status(resp) != 404L))
+  role <- cloud_member_role(cld, id, user_id)
+  if (is.na(role)) {
+    return(invisible(list(user_id = user_id, changed = FALSE)))
+  }
+  path <- paste0("/contents/", id, "/users/", user_id)
+  if (identical(role, "collaborator")) {
+    cloud_call(cld, "PATCH", path, body = list(role = "viewer"))
+  }
+  cloud_call(cld, "DELETE", path, allow = 404L)
+  invisible(list(user_id = user_id, changed = TRUE))
 }
 
 #' @rdname cloud_list_collaborators
@@ -122,8 +179,9 @@ cloud_remove_collaborator <- function(cld, id, user_id) {
 #'   or `keep`. By default nobody is removed, so a wrong list can only fail to
 #'   add people, never take access away.
 #'
-#' @return `cloud_sync_collaborators()` returns a list with `added` and
-#'   `removed` (user ids) and `failed`, a data frame of `user_id`, `action` and
+#' @return `cloud_sync_collaborators()` returns a list with `added`,
+#'   `invited` (invitations left pending) and `removed` (user ids), and
+#'   `failed`, a data frame of `user_id`, `action` and
 #'   `reason` for the changes that couldn't be made. Adding yourself is always
 #'   in `failed`, since Cloud doesn't allow it: another deployer's sync covers
 #'   it. The item's author is never removed.
@@ -151,13 +209,20 @@ cloud_sync_collaborators <- function(cld, id, user_ids, keep = character(), remo
     failed[[length(failed) + 1L]] <<- data.frame(user_id = user, action = action, reason = reason)
   }
   added <- character()
+  invited <- character()
   for (user in setdiff(unique(user_ids), c(collaborators, author))) {
     if (identical(user, me)) {
       fail(user, "add", "Cloud doesn't let you add yourself. Another deployer's sync adds you.")
       next
     }
     outcome <- tryCatch(cloud_add_collaborator(cld, id, user), phsdeploy_error = function(e) e)
-    if (inherits(outcome, "error")) fail(user, "add", one_line(outcome)) else added <- c(added, user)
+    if (inherits(outcome, "error")) {
+      fail(user, "add", one_line(outcome))
+    } else if (identical(outcome$status, "invited")) {
+      invited <- c(invited, user)
+    } else {
+      added <- c(added, user)
+    }
   }
   removed <- character()
   if (remove) {
@@ -167,7 +232,7 @@ cloud_sync_collaborators <- function(cld, id, user_ids, keep = character(), remo
     }
   }
   failed <- if (length(failed)) do.call(rbind, failed) else data.frame(user_id = character(), action = character(), reason = character())
-  list(added = added, removed = removed, failed = failed)
+  list(added = added, invited = invited, removed = removed, failed = failed)
 }
 
 #' Pair internal Connect users with Connect Cloud users
