@@ -21,7 +21,6 @@ cloud_id <- check_need("cloud_custom_id", "08-custom-domain.R")
 url <- check_need("cloud_custom_url", "08-custom-domain.R")
 
 local({
-  local_rsconnect_config()
   cld <- phs_connect_cld()
   original <- cloud_get_content(cld, cloud_id)$vanity_name
   new_name <- paste0(original, "-renamed")

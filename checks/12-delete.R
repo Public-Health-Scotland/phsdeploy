@@ -21,7 +21,6 @@ check_confirm(paste(
 ))
 
 local({
-  local_rsconnect_config()
   cld <- phs_connect_cld()
   for (id in cloud_ids) {
     item <- cloud_get_content(cld, id)

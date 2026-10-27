@@ -33,9 +33,7 @@
 #' @param client A connectapi client for internal Connect, by default
 #'   `phs_connect_int()`.
 #' @param cld A Connect Cloud connection from [phs_connect_cld()], or `NULL`
-#'   to sign in for this deploy only. Pass one to reuse it across several
-#'   deploys, from inside the same `local_rsconnect_config()` scope it was
-#'   created in.
+#'   to connect with the credential in the environment.
 #'
 #' @return A list with `guid`, `bundle_id`, `sha256`, `cloud_id`,
 #'   `first_deploy`, `title`, `access`, `domain_id`, `name`, `url` (the custom
@@ -49,6 +47,13 @@
 #'   finishes it as an update rather than creating another. A network failure
 #'   is retried once before it is reported, with the extra class
 #'   `phsdeploy_cloud_unreachable`.
+#'
+#' @section Running several deploys:
+#' rsconnect needs the Cloud account registered on disk to deploy. This
+#' registers it in a temporary folder of its own, removed when the deploy
+#' ends, by changing environment variables for the whole R process. So two
+#' deploys must not run at once in the same process. In a Shiny app, run each
+#' deploy in its own background process, for example with mirai.
 #' @export
 deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
                           domain_id = NULL, name = NULL,
@@ -76,10 +81,7 @@ deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
   # Registered after the temporary folder, so it runs before the folder is
   # removed.
   withr::defer(close_new_connections(connections_before))
-  if (is.null(cld)) {
-    local_rsconnect_config()
-    cld <- phs_connect_cld()
-  }
+  cld <- cld %||% phs_connect_cld()
   check_cld(cld)
   prepared <- prepare_bundle(guid, bundle_id, work, client)
 
@@ -102,6 +104,7 @@ deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
     name <- before$vanity_name
   }
 
+  local_cloud_registration(cld)
   run_deploy(cld, prepared$app_dir, cloud_id, title, work, first_deploy)
   after <- cloud_get_content(cld, cloud_id)
   if (is.null(after)) abort_missing_item(cloud_id)

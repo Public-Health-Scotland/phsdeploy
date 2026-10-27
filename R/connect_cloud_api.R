@@ -1,17 +1,15 @@
 #' Client for the Posit Connect Cloud API
 #'
 #' Deploying a bundle is done by rsconnect (`deployApp(appId =)`), maintained by
-#' Posit for Connect Cloud. This file covers what rsconnect does not provide
-#' yet: creating an item with a custom name on a PHS domain, listing domains,
-#' finding and reading items, and changing access outside a deploy. Those calls
-#' go to the API directly with httr2. Deleting uses rsconnect's own
-#' `deleteContent()`.
+#' Posit for Connect Cloud. Everything else goes to the API directly with
+#' httr2: creating an item with a custom name on a PHS domain, listing domains,
+#' finding, reading, changing and deleting items, and the account's users and
+#' each item's collaborators. None of these calls needs rsconnect.
 #'
-#' Posit has not published a reference for this API. The request shapes follow
-#' rsconnect's internal Cloud client, so must be checked against rsconnect's
-#' source for each new minimum version. When rsconnect gains a function for any
-#' call defined here, it should be used instead, removing the direct API call,
-#' and keeping this file as small as possible.
+#' The API's specification is published at
+#' <https://api.connect.posit.cloud/openapi.json>, without a written reference.
+#' Check new calls against it. When rsconnect gains a function for any call
+#' defined here, consider using it instead.
 #'
 #' Secret handling: the client secret is sent only in the token request's form
 #' body, and the access token only in Authorization headers. No condition raised
@@ -53,8 +51,7 @@ cloud_scope <- "vivid"
 
 #' Server name rsconnect uses for Connect Cloud accounts
 #'
-#' Needed to find the registered account when calling rsconnect functions such
-#' as `deleteContent()`.
+#' Needed to find the registered account when calling `rsconnect::deployApp()`.
 #'
 #' @format A single string.
 #' @noRd
@@ -770,11 +767,9 @@ cloud_set_access <- function(cld, id, access) {
 
 #' Delete a content item
 #'
-#' Uses `rsconnect::deleteContent()`, with `force = TRUE` so it doesn't ask for
-#' confirmation. It signs in with the account registered by the Cloud
-#' connection, so it must run inside the same `local_rsconnect_config()` scope.
-#' An item that is already gone counts as success and is reported with a
-#' message of class `phsdeploy_already_deleted`.
+#' Sends `DELETE /contents/{id}`. An item that is already gone (a 404, or
+#' pending deletion) counts as success and is reported with a message of class
+#' `phsdeploy_already_deleted`.
 #'
 #' @param cld A `phsdeploy_cld` connection.
 #' @param id Content id.
@@ -784,27 +779,22 @@ cloud_set_access <- function(cld, id, access) {
 cloud_delete_content <- function(cld, id) {
   check_cld(cld)
   check_content_id(id)
-  local_rsconnect_http()
-  result <- tryCatch(
-    {
-      suppressMessages(rsconnect::deleteContent(
-        contentId = id, account = cld$account, server = cloud_server, force = TRUE
-      ))
-      "deleted"
-    },
-    error = function(e) if (rlang::cnd_inherits(e, "rsconnect_http_404")) "gone" else e
-  )
-  if (inherits(result, "error")) {
-    detail <- squish_scrub(conditionMessage(result), cloud_secrets(cld))
-    cli::cli_abort(
-      c("Could not delete content {.val {id}} from Posit Connect Cloud.", "x" = "{detail}"),
-      class = c("phsdeploy_cloud_delete_error", "phsdeploy_error")
-    )
-  }
-  if (identical(result, "gone")) {
+  if (is.null(cloud_get_content(cld, id))) {
     cli::cli_inform(
       "Content {.val {id}} was already gone from Posit Connect Cloud.",
       class = "phsdeploy_already_deleted"
+    )
+    return(invisible(TRUE))
+  }
+  result <- tryCatch(
+    cloud_call(cld, "DELETE", paste0("/contents/", id), allow = 404L),
+    phsdeploy_cloud_http_error = function(e) e
+  )
+  if (inherits(result, "error")) {
+    cli::cli_abort(
+      c("Could not delete content {.val {id}} from Posit Connect Cloud.", "x" = "{conditionMessage(result)}"),
+      class = c("phsdeploy_cloud_delete_error", "phsdeploy_error"),
+      status = result$status
     )
   }
   invisible(TRUE)

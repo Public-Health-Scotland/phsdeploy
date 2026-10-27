@@ -60,7 +60,6 @@ link_opens <- function(url, host) {
 }
 
 local({
-  local_rsconnect_config()
   cld <- phs_connect_cld()
 
   check_confirm(paste("switch on private link sharing for the private item", cloud_id))

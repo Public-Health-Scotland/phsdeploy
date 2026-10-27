@@ -11,7 +11,6 @@
 source("checks/_helpers.R")
 
 local({
-  local_rsconnect_config()
   cld <- phs_connect_cld()
 
   check_step("Domains")

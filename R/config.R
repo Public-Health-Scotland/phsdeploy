@@ -87,6 +87,25 @@ new_phsdeploy_config <- function(int = NULL, cld = NULL) {
   )
 }
 
+#' Check a configuration has the part a connection needs
+#'
+#' @param config The value to check.
+#' @param part `"int"` or `"cld"`.
+#' @param call The environment of the calling function, shown in the error.
+#' @return `config`, invisibly. Otherwise an error of class
+#'   `phsdeploy_config_error`.
+#' @noRd
+check_config_part <- function(config, part, call = rlang::caller_env()) {
+  if (!inherits(config, "phsdeploy_config") || is.null(config[[part]])) {
+    cli::cli_abort(
+      "{.arg config} must be a {.cls phsdeploy_config} with a {.field {part}} part.",
+      class = c("phsdeploy_config_error", "phsdeploy_error"),
+      call = call
+    )
+  }
+  invisible(config)
+}
+
 #' Read an environment variable as a config value
 #'
 #' @param name The environment variable's name.

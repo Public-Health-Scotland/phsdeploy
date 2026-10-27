@@ -18,9 +18,6 @@ check_ok("Linked internal Connect as {.val {me$username}}.")
 
 check_step("Connect Cloud")
 local({
-  # rsconnect stores the registered account here, and the folder is removed
-  # when this block ends.
-  local_rsconnect_config()
   cld <- phs_connect_cld()
   print(cld)
   check_ok("Linked Connect Cloud account {.val {cld$account}} ({.val {cld$account_id}}).")

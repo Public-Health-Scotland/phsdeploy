@@ -15,23 +15,24 @@ An object of class \code{phsdeploy_cld} with \code{server}, \code{account},
 \code{account_id}, \code{client_id} and \code{client_secret}. Printing never shows the
 client secret.
 
-Otherwise an error of class \code{phsdeploy_rsconnect_config_not_temporary}
-(rsconnect's folders are not inside \code{tempdir()}), \code{phsdeploy_cloud_auth_error}
-(rsconnect could not register the account, also of class
-\code{phsdeploy_cloud_unreachable} when the network failed twice rather than
-the credentials being refused), \code{phsdeploy_cloud_token_error}
-or \code{phsdeploy_cloud_http_error} (the account id lookup failed), or
-\code{phsdeploy_cloud_account_not_found}.
+Otherwise an error of class \code{phsdeploy_cloud_token_error} (the credential
+was refused, or no token came back), \code{phsdeploy_cloud_http_error} (the
+account lookup failed) or \code{phsdeploy_cloud_account_not_found}.
 }
 \description{
-Registers the configured Connect Cloud account with rsconnect, which
-deploying and deleting need, and looks up the account's id through the
-Connect Cloud API. A network failure (no answer from the server) is retried
-once, since it often clears by itself. A refused credential isn't retried.
+Checks the credential by getting an access token, and looks up the
+account's id through the Connect Cloud API. Nothing is written to disk: the
+token is held in memory only, so a connection is safe to use in a Shiny app
+that serves several people from one R process. A network failure is retried
+by each API call. A refused credential isn't retried.
 }
 \details{
-rsconnect stores the account, credential included, in its config folder.
-\strong{Call \code{local_rsconnect_config()} (internal) first, in the calling
-function's frame,} so that folder is temporary and removed when the caller
-exits. Without it this aborts before anything is contacted.
+Deploying also needs the account registered with rsconnect, which
+\code{\link[=deploy_bundle]{deploy_bundle()}} does for itself, in a temporary folder of its own.
+}
+\examples{
+\dontrun{
+cld <- phs_connect_cld()
+cld
+}
 }

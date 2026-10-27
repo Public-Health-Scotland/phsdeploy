@@ -26,7 +26,6 @@ name <- paste0("phsdeploy-check-", check_stamp())
 check_save(custom_app = app, custom_guid = guid, custom_internal_title = internal_title)
 
 local({
-  local_rsconnect_config()
   cld <- phs_connect_cld()
 
   check_step("Find the wildcard domain")

@@ -15,7 +15,6 @@ guid <- check_need("int_basic_guid", "02-publish-internal.R")
 title <- check_need("int_basic_title", "02-publish-internal.R")
 
 local({
-  local_rsconnect_config()
   cld <- phs_connect_cld()
 
   check_confirm(paste0("create a private Cloud item titled \"", title, "\" and deploy into it"))

@@ -26,7 +26,6 @@ check_quietly(
 check_ok("Published data version 2.")
 
 local({
-  local_rsconnect_config()
   cld <- phs_connect_cld()
   before <- cloud_get_content(cld, cloud_id)
 

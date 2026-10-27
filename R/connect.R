@@ -16,15 +16,14 @@ phs_connect_int <- function(config = phsdeploy_config("int")) {
 
 #' Connect to Posit Connect Cloud
 #'
-#' Registers the configured Connect Cloud account with rsconnect, which
-#' deploying and deleting need, and looks up the account's id through the
-#' Connect Cloud API. A network failure (no answer from the server) is retried
-#' once, since it often clears by itself. A refused credential isn't retried.
+#' Checks the credential by getting an access token, and looks up the
+#' account's id through the Connect Cloud API. Nothing is written to disk: the
+#' token is held in memory only, so a connection is safe to use in a Shiny app
+#' that serves several people from one R process. A network failure is retried
+#' by each API call. A refused credential isn't retried.
 #'
-#' rsconnect stores the account, credential included, in its config folder.
-#' **Call `local_rsconnect_config()` (internal) first, in the calling
-#' function's frame,** so that folder is temporary and removed when the caller
-#' exits. Without it this aborts before anything is contacted.
+#' Deploying also needs the account registered with rsconnect, which
+#' [deploy_bundle()] does for itself, in a temporary folder of its own.
 #'
 #' @param config A `phsdeploy_config` with a `cld` part, by default read from
 #'   the environment with `phsdeploy_config("cld")`.
@@ -33,47 +32,18 @@ phs_connect_int <- function(config = phsdeploy_config("int")) {
 #'   `account_id`, `client_id` and `client_secret`. Printing never shows the
 #'   client secret.
 #'
-#'   Otherwise an error of class `phsdeploy_rsconnect_config_not_temporary`
-#'   (rsconnect's folders are not inside `tempdir()`), `phsdeploy_cloud_auth_error`
-#'   (rsconnect could not register the account, also of class
-#'   `phsdeploy_cloud_unreachable` when the network failed twice rather than
-#'   the credentials being refused), `phsdeploy_cloud_token_error`
-#'   or `phsdeploy_cloud_http_error` (the account id lookup failed), or
-#'   `phsdeploy_cloud_account_not_found`.
+#'   Otherwise an error of class `phsdeploy_cloud_token_error` (the credential
+#'   was refused, or no token came back), `phsdeploy_cloud_http_error` (the
+#'   account lookup failed) or `phsdeploy_cloud_account_not_found`.
 #' @export
+#' @examples
+#' \dontrun{
+#' cld <- phs_connect_cld()
+#' cld
+#' }
 phs_connect_cld <- function(config = phsdeploy_config("cld")) {
-  check_rsconnect_config_temporary()
+  check_config_part(config, "cld")
   settings <- config$cld
-
-  registered <- register_cloud_account(settings)
-  if (is_network_failure(registered)) {
-    Sys.sleep(2)
-    registered <- register_cloud_account(settings)
-  }
-  if (inherits(registered, "error")) {
-    detail <- squish_scrub(conditionMessage(registered), settings$client_secret)
-    network <- is_network_failure(registered)
-    cli::cli_abort(
-      c(
-        if (network) {
-          "Could not reach Posit Connect Cloud to sign in, even after a retry."
-        } else {
-          "Posit Connect Cloud refused the sign-in."
-        },
-        "x" = "{detail}",
-        "i" = if (network) {
-          "This is a network problem, not the credentials. If it persists, restart R."
-        } else {
-          "Check {.envvar PHSDEPLOY_CLD_CLIENT_ID} and {.envvar PHSDEPLOY_CLD_CLIENT_SECRET}."
-        }
-      ),
-      class = c(
-        if (network) "phsdeploy_cloud_unreachable",
-        "phsdeploy_cloud_auth_error", "phsdeploy_error"
-      )
-    )
-  }
-
   cld <- new_phsdeploy_cld(
     account = settings$account,
     client_id = settings$client_id,
@@ -83,19 +53,71 @@ phs_connect_cld <- function(config = phsdeploy_config("cld")) {
   cld
 }
 
+#' Register a Cloud connection's account with rsconnect, temporarily
+#'
+#' rsconnect needs the account registered before `deployApp()`. It stores the
+#' account, credential included, in its config folder, so this first points
+#' rsconnect's folders at a new temporary directory (`local_rsconnect_config()`),
+#' removed when `.local_envir` exits. That changes environment variables for
+#' the whole R process, so two deploys must not run at once in one process.
+#' Run each in its own background process instead.
+#'
+#' A network failure is retried once, since it often clears by itself. A
+#' refused credential isn't retried.
+#'
+#' @param cld A `phsdeploy_cld` connection.
+#' @param .local_envir The environment whose exit removes the registration.
+#' @return `TRUE`, invisibly. Otherwise an error of class
+#'   `phsdeploy_cloud_auth_error`, also of class `phsdeploy_cloud_unreachable`
+#'   when the network failed twice rather than the credential being refused.
+#' @noRd
+local_cloud_registration <- function(cld, .local_envir = parent.frame()) {
+  local_rsconnect_config(.local_envir = .local_envir)
+  registered <- register_cloud_account(cld)
+  if (is_network_failure(registered)) {
+    Sys.sleep(2)
+    registered <- register_cloud_account(cld)
+  }
+  if (inherits(registered, "error")) {
+    detail <- squish_scrub(conditionMessage(registered), cloud_secrets(cld))
+    network <- is_network_failure(registered)
+    cli::cli_abort(
+      c(
+        if (network) {
+          "Could not reach Posit Connect Cloud to sign in for the deploy, even after a retry."
+        } else {
+          "Posit Connect Cloud refused the sign-in for the deploy."
+        },
+        "x" = "{detail}",
+        "i" = if (network) {
+          "This is a network problem, not the credential. If it persists, restart R."
+        } else {
+          "Check the Connect Cloud client ID and secret."
+        }
+      ),
+      class = c(
+        if (network) "phsdeploy_cloud_unreachable",
+        "phsdeploy_cloud_auth_error", "phsdeploy_error"
+      )
+    )
+  }
+  invisible(TRUE)
+}
+
 #' Register the Connect Cloud account with rsconnect
 #'
-#' @param settings The `cld` part of a `phsdeploy_config`.
+#' @param cld A `phsdeploy_cld` connection.
 #' @return `TRUE`, or the error rsconnect raised.
 #' @noRd
-register_cloud_account <- function(settings) {
+register_cloud_account <- function(cld) {
+  check_rsconnect_config_temporary()
   local_rsconnect_http()
   tryCatch(
     {
       rsconnect::connectCloudClientCredentials(
-        clientId = settings$client_id,
-        clientSecret = settings$client_secret,
-        accountName = settings$account,
+        clientId = cld$client_id,
+        clientSecret = cld$client_secret,
+        accountName = cld$account,
         quiet = TRUE
       )
       TRUE

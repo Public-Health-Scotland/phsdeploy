@@ -38,9 +38,7 @@ so the address is \verb{https://<name>.<domain>}.}
 \code{phs_connect_int()}.}
 
 \item{cld}{A Connect Cloud connection from \code{\link[=phs_connect_cld]{phs_connect_cld()}}, or \code{NULL}
-to sign in for this deploy only. Pass one to reuse it across several
-deploys, from inside the same \code{local_rsconnect_config()} scope it was
-created in.}
+to connect with the credential in the environment.}
 }
 \value{
 A list with \code{guid}, \code{bundle_id}, \code{sha256}, \code{cloud_id},
@@ -78,3 +76,12 @@ After deploying, the item is read back. Its address and access must be
 what they were (or, for a first deploy, what was asked for), otherwise an
 error is raised.
 }
+\section{Running several deploys}{
+
+rsconnect needs the Cloud account registered on disk to deploy. This
+registers it in a temporary folder of its own, removed when the deploy
+ends, by changing environment variables for the whole R process. So two
+deploys must not run at once in the same process. In a Shiny app, run each
+deploy in its own background process, for example with mirai.
+}
+

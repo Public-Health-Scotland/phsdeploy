@@ -21,7 +21,6 @@ url <- check_need("cloud_custom_url", "08-custom-domain.R")
 app_dir <- c(basic = "basic-shiny", phsshiny = "phsshiny-app")[[app]]
 
 local({
-  local_rsconnect_config()
   cld <- phs_connect_cld()
 
   check_confirm(paste("make", url, "public (anyone can view it)"))
