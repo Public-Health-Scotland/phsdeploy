@@ -41,7 +41,8 @@ library(phsdeploy)
 ```
 
 Settings come from environment variables (`phsdeploy_config()`), or from
-values (`phsdeploy_int_config()`, `phsdeploy_cld_config()`), for example
+values (`phsdeploy_int_config()`, `phsdeploy_cld_config()`,
+`phsdeploy_sio_config()`), for example
 a credential an app stores for each user.
 
 | Area | Functions |
@@ -55,6 +56,7 @@ a credential an app stores for each user.
 | Cloud sharing | `cloud_private_link()`, `cloud_set_private_link()` |
 | Cloud domains | `cloud_list_domains()`, `cloud_public_url()` |
 | Cloud users and collaborators | `cloud_me()`, `cloud_list_users()`, `cloud_list_collaborators()`, `cloud_add_collaborator()`, `cloud_remove_collaborator()`, `cloud_sync_collaborators()`, `match_cloud_users()` |
+| shinyapps.io (read only) | `sio_list_apps()` |
 
 A typical deploy, with every deployer made a collaborator so any of them
 can update the item later:

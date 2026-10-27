@@ -49,6 +49,7 @@ If a first deploy fails part-way (for example on a network timeout), run the sam
 | `12-internal-handover.R` | Content listing, a group as viewer then collaborator on the test app, group members, tags | The test group is on the test app's access list for the length of the check |
 | `13-cloud-collaborators.R` | Your Cloud role, the account's users, the deployer group matched by email, and (with a colleague's email) adding and removing a collaborator | With `PHSDEPLOY_CHECK_CLOUD_USER`, that colleague is a collaborator for the length of the check |
 | `14-delete.R` | Deletes everything the checks created | Removes all the items created |
+| `15-shinyapps.R` | The shinyapps.io account's apps, read only. Needs the `PHSDEPLOY_SIO_*` variables | Nothing |
 
 `12` uses the group `PHS-PositConnect-TEST-RM`, or the one named in `PHSDEPLOY_CHECK_GROUP`. `13` matches the group `PHS-PositConnect-PROD-Admin`, or the one in `PHSDEPLOY_CHECK_DEPLOYER_GROUP`, and only changes collaborators when `PHSDEPLOY_CHECK_CLOUD_USER` is set to a colleague's Cloud email, since Cloud doesn't let you add yourself.
 

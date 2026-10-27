@@ -3,14 +3,18 @@
 \name{phsdeploy_cld_config}
 \alias{phsdeploy_cld_config}
 \alias{phsdeploy_int_config}
+\alias{phsdeploy_sio_config}
 \title{Build a configuration from values}
 \usage{
 phsdeploy_cld_config(account, client_id, client_secret)
 
 phsdeploy_int_config(url, key)
+
+phsdeploy_sio_config(account, token, secret)
 }
 \arguments{
-\item{account}{The Connect Cloud account name.}
+\item{account}{The Connect Cloud account name, or for
+\code{phsdeploy_sio_config()} the shinyapps.io account name.}
 
 \item{client_id, client_secret}{A Connect Cloud credential with access to
 that account.}
@@ -18,10 +22,13 @@ that account.}
 \item{url}{The internal Connect server's URL.}
 
 \item{key}{An API key for that server.}
+
+\item{token, secret}{A shinyapps.io token for that account, and its secret.}
 }
 \value{
 An object of class \code{phsdeploy_config}, with an \code{int} part from
-\code{phsdeploy_int_config()} or a \code{cld} part from \code{phsdeploy_cld_config()}.
+\code{phsdeploy_int_config()}, a \code{cld} part from \code{phsdeploy_cld_config()} or
+an \code{sio} part from \code{phsdeploy_sio_config()}.
 
 If a value is missing or invalid, an error of class
 \code{phsdeploy_config_error}, with \code{missing} and \code{invalid} fields naming the

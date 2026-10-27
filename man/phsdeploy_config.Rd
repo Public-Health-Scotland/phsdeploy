@@ -7,12 +7,14 @@
 phsdeploy_config(needs = c("int", "cld"))
 }
 \arguments{
-\item{needs}{Which settings to read: \code{"int"} (internal Connect), \code{"cld"}
-(Connect Cloud), or both.}
+\item{needs}{Which settings to read: any of \code{"int"} (internal Connect),
+\code{"cld"} (Connect Cloud) and \code{"sio"} (shinyapps.io). By default \code{"int"}
+and \code{"cld"}.}
 }
 \value{
-An object of class \code{phsdeploy_config}: a list with \code{int} (\code{url},
-\code{key}) and/or \code{cld} (\code{account}, \code{client_id}, \code{client_secret}).
+An object of class \code{phsdeploy_config}: a list with any of \code{int}
+(\code{url}, \code{key}), \code{cld} (\code{account}, \code{client_id}, \code{client_secret}) and \code{sio}
+(\code{account}, \code{token}, \code{secret}).
 
 If anything is missing or invalid, an error of class
 \code{phsdeploy_config_error} is raised, with \code{missing} and \code{invalid} fields
@@ -38,9 +40,15 @@ Variables read:
 that account
 \item \code{PHSDEPLOY_CLD_CLIENT_SECRET}: that credential's client secret
 }
+\item shinyapps.io (\code{needs = "sio"}), read only:
+\itemize{
+\item \code{PHSDEPLOY_SIO_ACCOUNT}: the shinyapps.io account name
+\item \code{PHSDEPLOY_SIO_TOKEN}: a token for that account
+\item \code{PHSDEPLOY_SIO_SECRET}: that token's secret
+}
 }
 
-Printing the result never shows the key or the client secret.
+Printing the result never shows a key, token or secret.
 }
 \examples{
 \dontrun{

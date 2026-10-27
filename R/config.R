@@ -13,14 +13,20 @@
 #'   * `PHSDEPLOY_CLD_CLIENT_ID`: the client ID of a credential with access to
 #'     that account
 #'   * `PHSDEPLOY_CLD_CLIENT_SECRET`: that credential's client secret
+#' * shinyapps.io (`needs = "sio"`), read only:
+#'   * `PHSDEPLOY_SIO_ACCOUNT`: the shinyapps.io account name
+#'   * `PHSDEPLOY_SIO_TOKEN`: a token for that account
+#'   * `PHSDEPLOY_SIO_SECRET`: that token's secret
 #'
-#' Printing the result never shows the key or the client secret.
+#' Printing the result never shows a key, token or secret.
 #'
-#' @param needs Which settings to read: `"int"` (internal Connect), `"cld"`
-#'   (Connect Cloud), or both.
+#' @param needs Which settings to read: any of `"int"` (internal Connect),
+#'   `"cld"` (Connect Cloud) and `"sio"` (shinyapps.io). By default `"int"`
+#'   and `"cld"`.
 #'
-#' @return An object of class `phsdeploy_config`: a list with `int` (`url`,
-#'   `key`) and/or `cld` (`account`, `client_id`, `client_secret`).
+#' @return An object of class `phsdeploy_config`: a list with any of `int`
+#'   (`url`, `key`), `cld` (`account`, `client_id`, `client_secret`) and `sio`
+#'   (`account`, `token`, `secret`).
 #'
 #'   If anything is missing or invalid, an error of class
 #'   `phsdeploy_config_error` is raised, with `missing` and `invalid` fields
@@ -33,12 +39,13 @@
 #' server_config
 #' }
 phsdeploy_config <- function(needs = c("int", "cld")) {
-  needs <- rlang::arg_match(needs, c("int", "cld"), multiple = TRUE)
+  needs <- rlang::arg_match(needs, c("int", "cld", "sio"), multiple = TRUE)
 
   missing <- character()
   invalid <- character()
   int <- NULL
   cld <- NULL
+  sio <- NULL
 
   if ("int" %in% needs) {
     url <- config_value("PHSDEPLOY_INT_URL", url = TRUE)
@@ -61,11 +68,21 @@ phsdeploy_config <- function(needs = c("int", "cld")) {
     cld <- list(account = account, client_id = client_id, client_secret = client_secret)
   }
 
+  if ("sio" %in% needs) {
+    account <- config_value("PHSDEPLOY_SIO_ACCOUNT")
+    token <- config_value("PHSDEPLOY_SIO_TOKEN")
+    secret <- config_value("PHSDEPLOY_SIO_SECRET")
+    if (is.null(account)) missing <- c(missing, "PHSDEPLOY_SIO_ACCOUNT")
+    if (is.null(token)) missing <- c(missing, "PHSDEPLOY_SIO_TOKEN")
+    if (is.null(secret)) missing <- c(missing, "PHSDEPLOY_SIO_SECRET")
+    sio <- list(account = account, token = token, secret = secret)
+  }
+
   if (length(missing) || length(invalid)) {
     abort_config(missing, invalid)
   }
 
-  new_phsdeploy_config(int = int, cld = cld)
+  new_phsdeploy_config(int = int, cld = cld, sio = sio)
 }
 
 #' Build a configuration from values
@@ -80,12 +97,15 @@ phsdeploy_config <- function(needs = c("int", "cld")) {
 #'
 #' @param url The internal Connect server's URL.
 #' @param key An API key for that server.
-#' @param account The Connect Cloud account name.
+#' @param account The Connect Cloud account name, or for
+#'   `phsdeploy_sio_config()` the shinyapps.io account name.
 #' @param client_id,client_secret A Connect Cloud credential with access to
 #'   that account.
+#' @param token,secret A shinyapps.io token for that account, and its secret.
 #'
 #' @return An object of class `phsdeploy_config`, with an `int` part from
-#'   `phsdeploy_int_config()` or a `cld` part from `phsdeploy_cld_config()`.
+#'   `phsdeploy_int_config()`, a `cld` part from `phsdeploy_cld_config()` or
+#'   an `sio` part from `phsdeploy_sio_config()`.
 #'
 #'   If a value is missing or invalid, an error of class
 #'   `phsdeploy_config_error`, with `missing` and `invalid` fields naming the
@@ -116,6 +136,15 @@ phsdeploy_int_config <- function(url, key) {
   invalid <- if (!is.null(values$url) && !grepl("^https?://", values$url)) "url" else character()
   if (length(missing) || length(invalid)) abort_config_args(missing, invalid)
   new_phsdeploy_config(int = values)
+}
+
+#' @rdname phsdeploy_cld_config
+#' @export
+phsdeploy_sio_config <- function(account, token, secret) {
+  values <- list(account = config_arg(account), token = config_arg(token), secret = config_arg(secret))
+  missing <- names(values)[vapply(values, is.null, logical(1))]
+  if (length(missing)) abort_config_args(missing, character())
+  new_phsdeploy_config(sio = values)
 }
 
 #' Clean a config value given as an argument
@@ -160,13 +189,15 @@ abort_config_args <- function(missing, invalid, call = rlang::caller_env()) {
 #'
 #' @param int `NULL` or `list(url, key)`.
 #' @param cld `NULL` or `list(account, client_id, client_secret)`.
+#' @param sio `NULL` or `list(account, token, secret)`.
 #' @return An object of class `phsdeploy_config`.
 #' @noRd
-new_phsdeploy_config <- function(int = NULL, cld = NULL) {
+new_phsdeploy_config <- function(int = NULL, cld = NULL, sio = NULL) {
   structure(
     c(
       if (!is.null(int)) list(int = int),
-      if (!is.null(cld)) list(cld = cld)
+      if (!is.null(cld)) list(cld = cld),
+      if (!is.null(sio)) list(sio = sio)
     ),
     class = "phsdeploy_config"
   )
@@ -175,7 +206,7 @@ new_phsdeploy_config <- function(int = NULL, cld = NULL) {
 #' Check a configuration has the part a connection needs
 #'
 #' @param config The value to check.
-#' @param part `"int"` or `"cld"`.
+#' @param part `"int"`, `"cld"` or `"sio"`.
 #' @param call The environment of the calling function, shown in the error.
 #' @return `config`, invisibly. Otherwise an error of class
 #'   `phsdeploy_config_error`.
@@ -250,7 +281,7 @@ abort_config <- function(missing, invalid) {
 
 #' Format a configuration for printing
 #'
-#' Shows which settings are present, redacting any key and client secret,
+#' Shows which settings are present, redacting any key, token and secret,
 #' ensuring a printed configuration is safe to share.
 #'
 #' @param x A `phsdeploy_config`.
@@ -271,6 +302,9 @@ format.phsdeploy_config <- function(x, ...) {
         paste0("    client_id: ", x$cld$client_id),
         "    client_secret: <hidden>"
       )
+    },
+    if (!is.null(x$sio)) {
+      c("  sio:", paste0("    account: ", x$sio$account), "    token: <hidden>", "    secret: <hidden>")
     }
   )
 }

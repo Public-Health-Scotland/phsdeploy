@@ -1,3 +1,8 @@
+# phsdeploy (development version)
+
+* New `sio_list_apps()` lists the apps on the shinyapps.io account, read only, while they move to Connect Cloud. It reads `PHSDEPLOY_SIO_ACCOUNT`, `PHSDEPLOY_SIO_TOKEN` and `PHSDEPLOY_SIO_SECRET`, through `phsdeploy_config("sio")`, or takes values from `phsdeploy_sio_config()`.
+* New check: `15-shinyapps.R`.
+
 # phsdeploy 0.1.0
 
 * Connecting to Connect Cloud no longer uses rsconnect. `phs_connect_cld()` only checks the credential and looks up the account through the API, so a connection is safe to use in a Shiny app serving several people. `deploy_bundle()` registers with rsconnect itself, in a temporary folder, and deleting uses the API.
