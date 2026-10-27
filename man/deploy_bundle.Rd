@@ -45,7 +45,9 @@ created in.}
 \value{
 A list with \code{guid}, \code{bundle_id}, \code{sha256}, \code{cloud_id},
 \code{first_deploy}, \code{title}, \code{access}, \code{domain_id}, \code{name}, \code{url} (the custom
-address, or \code{NA}) and \code{repo_changes} (from the manifest rewrite).
+address, or \code{NA}), \code{default_url} (Cloud's own address for the item,
+\verb{https://<id>.share.connect.posit.cloud}), \code{private_link_enabled} and
+\code{repo_changes} (from the manifest rewrite).
 
 Otherwise an error of class \code{phsdeploy_error}. A failed deploy raises
 \code{phsdeploy_deploy_failed} with the item's \code{cloud_id}. If this call created

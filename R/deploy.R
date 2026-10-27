@@ -39,7 +39,9 @@
 #'
 #' @return A list with `guid`, `bundle_id`, `sha256`, `cloud_id`,
 #'   `first_deploy`, `title`, `access`, `domain_id`, `name`, `url` (the custom
-#'   address, or `NA`) and `repo_changes` (from the manifest rewrite).
+#'   address, or `NA`), `default_url` (Cloud's own address for the item,
+#'   `https://<id>.share.connect.posit.cloud`), `private_link_enabled` and
+#'   `repo_changes` (from the manifest rewrite).
 #'
 #'   Otherwise an error of class `phsdeploy_error`. A failed deploy raises
 #'   `phsdeploy_deploy_failed` with the item's `cloud_id`. If this call created
@@ -93,7 +95,8 @@ deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
     expected <- list(
       vanity_name = flat_chr(before$vanity_name),
       domain_id = flat_chr(before$domain_id),
-      access = before$access
+      access = before$access,
+      private_link_enabled = isTRUE(before$private_link_enabled)
     )
     domain <- find_domain(cld, flat_chr(before$domain_id))
     name <- before$vanity_name
@@ -115,6 +118,8 @@ deploy_bundle <- function(guid, cloud_id = NULL, bundle_id = NULL, title = NULL,
     domain_id = flat_chr(after$domain_id),
     name = flat_chr(after$vanity_name),
     url = if (is.null(domain)) NA_character_ else cloud_public_url(domain, name),
+    default_url = flat_chr(after$current_revision$url),
+    private_link_enabled = isTRUE(after$private_link_enabled),
     repo_changes = prepared$changes
   )
 }
@@ -476,11 +481,12 @@ run_deploy <- function(cld, app_dir, cloud_id, title, dir, first_deploy) {
 #' Check a Cloud item after deploying
 #'
 #' The address must be as expected with a first deploy private, and an
-#' update not changing the access rights.
+#' update not changing the access rights or private link sharing, so a
+#' product shared by private link stays shared.
 #'
 #' @param item The item, read back after deploying.
 #' @param expected A list with `vanity_name` and `domain_id`, and for an update
-#'   `access`.
+#'   `access` and `private_link_enabled`.
 #' @param first_deploy `TRUE` for a first deploy.
 #' @return `TRUE`, invisibly. Otherwise an error of class
 #'   `phsdeploy_address_changed` or `phsdeploy_access_changed`.
@@ -502,6 +508,13 @@ check_deployed_item <- function(item, expected, first_deploy) {
   if (!access_ok) {
     cli::cli_abort(
       "Cloud item {.val {item$id}} has unexpected access {.val {item$access}} after deploying.",
+      class = c("phsdeploy_access_changed", "phsdeploy_error"),
+      cloud_id = item$id
+    )
+  }
+  if (!first_deploy && !identical(isTRUE(item$private_link_enabled), expected$private_link_enabled)) {
+    cli::cli_abort(
+      "Cloud item {.val {item$id}} has private link sharing {.val {isTRUE(item$private_link_enabled)}} after deploying, not {.val {expected$private_link_enabled}}.",
       class = c("phsdeploy_access_changed", "phsdeploy_error"),
       cloud_id = item$id
     )
