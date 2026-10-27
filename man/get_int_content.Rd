@@ -13,8 +13,10 @@ get_int_content(guid, client = phs_connect_int())
 }
 \value{
 A list with \code{guid}, \code{name}, \code{title}, \code{owner_guid}, \code{app_mode},
-\code{bundle_id} (character, \code{NA} if never deployed), \code{last_deployed_time},
-\code{content_url} and \code{dashboard_url} (\code{NA} when the server gives none).
+\code{app_role} (your relationship to the item: \code{owner}, \code{editor}, \code{viewer} or
+\code{none}), \code{bundle_id} (character, \code{NA} if never deployed),
+\code{last_deployed_time}, \code{content_url} and \code{dashboard_url} (\code{NA} when the
+server gives none).
 }
 \description{
 Read one item of Connect (internal) content

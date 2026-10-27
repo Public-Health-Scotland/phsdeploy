@@ -3,8 +3,10 @@
 #' @param guid The content GUID on the internal Connect server.
 #' @param client A connectapi client, by default `phs_connect_int()`.
 #' @return A list with `guid`, `name`, `title`, `owner_guid`, `app_mode`,
-#'   `bundle_id` (character, `NA` if never deployed), `last_deployed_time`,
-#'   `content_url` and `dashboard_url` (`NA` when the server gives none).
+#'   `app_role` (your relationship to the item: `owner`, `editor`, `viewer` or
+#'   `none`), `bundle_id` (character, `NA` if never deployed),
+#'   `last_deployed_time`, `content_url` and `dashboard_url` (`NA` when the
+#'   server gives none).
 #' @export
 get_int_content <- function(guid, client = phs_connect_int()) {
   check_guid(guid)
@@ -20,7 +22,7 @@ get_int_content <- function(guid, client = phs_connect_int()) {
 #'
 #' @param item A connectapi `Content` object.
 #' @return A list with `guid`, `name`, `title`, `owner_guid`, `app_mode`,
-#'   `bundle_id` (`NA` if never deployed), `last_deployed_time`,
+#'   `app_role`, `bundle_id` (`NA` if never deployed), `last_deployed_time`,
 #'   `content_url` and `dashboard_url` (`NA` when the server gives none).
 #' @noRd
 content_summary <- function(item) {
@@ -31,6 +33,7 @@ content_summary <- function(item) {
     title = flat_chr(x$title),
     owner_guid = flat_chr(x$owner_guid),
     app_mode = flat_chr(x$app_mode),
+    app_role = flat_chr(x$app_role),
     bundle_id = flat_chr(x$bundle_id),
     last_deployed_time = flat_chr(x$last_deployed_time),
     content_url = flat_chr(x$content_url),
