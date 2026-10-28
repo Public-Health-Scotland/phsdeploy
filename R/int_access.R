@@ -212,6 +212,38 @@ int_group_members <- function(client = phs_connect_int(), group_guid) {
   int_frame(records, c("guid", "username", "email", "first_name", "last_name", "user_role"))
 }
 
+#' Every user on internal Connect
+#'
+#' For choosing people by name or email, such as a product's owner. Reads
+#' every page of the user list. On PHS's Connect a username is the person's
+#' email address.
+#'
+#' @inheritParams list_int_content
+#' @param page_size How many users to read per request.
+#'
+#' @return A data frame with one row per user, all columns character:
+#'   `guid`, `username`, `email`, `first_name`, `last_name`, `user_role` and
+#'   `locked`. Otherwise an error of class `phsdeploy_int_http_error`.
+#' @export
+#' @examples
+#' \dontrun{
+#' users <- int_list_users()
+#' users[grepl("smith", users$email), ]
+#' }
+int_list_users <- function(client = phs_connect_int(), page_size = 500L) {
+  fields <- c("guid", "username", "email", "first_name", "last_name", "user_role", "locked")
+  pages <- list()
+  page <- 1L
+  repeat {
+    records <- int_call(client, "GET", "v1/users", query = list(page_number = page, page_size = page_size))
+    pages[[page]] <- int_frame(records, fields)
+    if (length(records) < page_size) break
+    page <- page + 1L
+  }
+  users <- do.call(rbind, pages)
+  users[!duplicated(users$guid), , drop = FALSE]
+}
+
 # Tags -------------------------------------------------------------------------
 
 #' Internal Connect tags

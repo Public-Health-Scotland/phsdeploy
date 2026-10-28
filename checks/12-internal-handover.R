@@ -2,7 +2,8 @@
 #
 # Adds a group to the basic test app's access list as a viewer, promotes it
 # to collaborator (which deploying to Cloud needs), then removes it. Also
-# lists the content your key sees, the group's members, and the tags.
+# lists the content your key sees, the group's members, every user, and
+# the tags.
 #
 # The group is PHS-PositConnect-TEST-RM unless PHSDEPLOY_CHECK_GROUP names
 # another. It needs no members, since only the access list changes.
@@ -28,6 +29,11 @@ check_step("Find the group and its members")
 group <- int_find_group(client, group_name)
 members <- int_group_members(client, group$guid)
 check_ok("Found {.val {group$name}}, with {nrow(members)} member{?s}.")
+
+check_step("Every user, for choosing people by name")
+users <- int_list_users(client)
+if (!nrow(users) || !all(members$guid %in% users$guid)) stop("The user list is empty or misses some of the group's members.")
+check_ok("Listed {nrow(users)} user{?s}, including every member of the group.")
 
 check_confirm(paste("add", group_name, "to the test app's access list, then remove it"))
 
